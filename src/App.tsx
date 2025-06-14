@@ -29,6 +29,7 @@ const App = () => (
             <Route path="/" element={<Web3Dashboard />} />
             <Route path="/courses" element={<CourseHub />} />
             <Route path="/courses/:courseId" element={<CourseViewer />} />
+            <Route path="/course/:slug" element={<CourseViewer />} />
             <Route path="/chat" element={<CommunityChat />} />
             <Route path="/events" element={<EventHub />} />
             <Route path="/documents" element={<DocumentationCenter />} />

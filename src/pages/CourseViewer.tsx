@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +14,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { createSlug, extractIdFromSlug } from '@/utils/slugUtils';
+import CommentsSection from '@/components/course/CommentsSection';
 
 interface Course {
   id: string;
@@ -46,7 +47,7 @@ interface Lesson {
 }
 
 const CourseViewer = () => {
-  const { courseId } = useParams();
+  const { courseId, slug } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
@@ -55,23 +56,52 @@ const CourseViewer = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (courseId) {
-      fetchCourseData();
+    const identifier = courseId || extractIdFromSlug(slug || '') || slug;
+    if (identifier) {
+      fetchCourseData(identifier);
     }
-  }, [courseId]);
+  }, [courseId, slug]);
 
-  const fetchCourseData = async () => {
+  const fetchCourseData = async (identifier: string) => {
     try {
-      // Fetch course info
-      const { data: courseData, error: courseError } = await supabase
+      let courseData;
+      
+      // Try to fetch by ID first
+      const { data: courseById, error: courseByIdError } = await supabase
         .from('courses')
         .select('*')
-        .eq('id', courseId)
+        .eq('id', identifier)
         .eq('is_public', true)
         .single();
 
-      if (courseError) throw courseError;
+      if (courseById && !courseByIdError) {
+        courseData = courseById;
+      } else {
+        // If not found by ID, try to search by title slug
+        const { data: coursesByTitle, error: coursesByTitleError } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('is_public', true);
+
+        if (coursesByTitleError) throw coursesByTitleError;
+
+        // Find course by matching slug
+        courseData = coursesByTitle?.find(course => 
+          createSlug(course.title) === identifier
+        );
+
+        if (!courseData) {
+          throw new Error('Course not found');
+        }
+      }
+
       setCourse(courseData);
+
+      // Update URL to use slug if we're currently using ID
+      if (courseId && courseData.title) {
+        const courseSlug = createSlug(courseData.title);
+        navigate(`/course/${courseSlug}`, { replace: true });
+      }
 
       // Fetch modules with lessons
       const { data: modulesData, error: modulesError } = await supabase
@@ -80,7 +110,7 @@ const CourseViewer = () => {
           *,
           lessons(*)
         `)
-        .eq('course_id', courseId)
+        .eq('course_id', courseData.id)
         .order('order_index');
 
       if (modulesError) throw modulesError;
@@ -160,173 +190,178 @@ const CourseViewer = () => {
   const embedUrl = currentLesson?.video_url ? getYouTubeEmbedUrl(currentLesson.video_url) : null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-120px)]">
-      {/* Main Video/Content Area */}
-      <div className="lg:col-span-3 space-y-4">
-        {/* Back Button */}
-        <Button
-          variant="outline"
-          onClick={() => navigate('/courses')}
-          className="border-slate-600 text-white hover:bg-slate-700"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Quay lại khóa học
-        </Button>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-120px)]">
+        {/* Main Video/Content Area */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Back Button */}
+          <Button
+            variant="outline"
+            onClick={() => navigate('/courses')}
+            className="border-slate-600 text-white hover:bg-slate-700"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Quay lại khóa học
+          </Button>
 
-        {/* Video/Content Display */}
-        <Card className="glass border-slate-600">
-          <CardContent className="p-0">
-            {currentLesson ? (
-              <div>
-                {/* Video Area */}
-                <div className="w-full h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center rounded-t-lg">
-                  {embedUrl ? (
-                    <iframe
-                      src={embedUrl}
-                      title={currentLesson.title}
-                      className="w-full h-full rounded-t-lg"
-                      allowFullScreen
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    />
-                  ) : (
-                    <div className="text-center">
-                      <Play className="w-16 h-16 text-white/50 mx-auto mb-4" />
-                      <p className="text-white/70">Video chưa có sẵn hoặc URL không hợp lệ</p>
-                      {currentLesson.video_url && (
-                        <p className="text-white/50 text-sm mt-2">URL: {currentLesson.video_url}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Lesson Info */}
-                <div className="p-6">
-                  <h2 className="text-2xl font-bold text-white mb-2">{currentLesson.title}</h2>
-                  
-                  {/* Course Info */}
-                  <div className="flex items-center space-x-4 mb-4 text-sm text-slate-400">
-                    <span className="flex items-center">
-                      <User className="w-4 h-4 mr-1" />
-                      {course.title}
-                    </span>
-                    <Badge variant="outline" className="border-purple-500/30 text-purple-400">
-                      {getLevelText(course.level)}
-                    </Badge>
-                    <Badge variant="outline" className="border-cyan-500/30 text-cyan-400">
-                      {course.category}
-                    </Badge>
+          {/* Video/Content Display */}
+          <Card className="glass border-slate-600">
+            <CardContent className="p-0">
+              {currentLesson ? (
+                <div>
+                  {/* Video Area */}
+                  <div className="w-full h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center rounded-t-lg">
+                    {embedUrl ? (
+                      <iframe
+                        src={embedUrl}
+                        title={currentLesson.title}
+                        className="w-full h-full rounded-t-lg"
+                        allowFullScreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      />
+                    ) : (
+                      <div className="text-center">
+                        <Play className="w-16 h-16 text-white/50 mx-auto mb-4" />
+                        <p className="text-white/70">Video chưa có sẵn hoặc URL không hợp lệ</p>
+                        {currentLesson.video_url && (
+                          <p className="text-white/50 text-sm mt-2">URL: {currentLesson.video_url}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Lesson Content */}
-                  {currentLesson.content_md && (
-                    <div className="prose prose-invert max-w-none">
-                      <div className="bg-slate-800/50 p-4 rounded border border-slate-600">
-                        <h3 className="text-white mb-3">Nội dung bài học:</h3>
-                        <div className="text-slate-300 whitespace-pre-wrap">
-                          {currentLesson.content_md}
+                  {/* Lesson Info */}
+                  <div className="p-6">
+                    <h2 className="text-2xl font-bold text-white mb-2">{currentLesson.title}</h2>
+                    
+                    {/* Course Info */}
+                    <div className="flex items-center space-x-4 mb-4 text-sm text-slate-400">
+                      <span className="flex items-center">
+                        <User className="w-4 h-4 mr-1" />
+                        {course.title}
+                      </span>
+                      <Badge variant="outline" className="border-purple-500/30 text-purple-400">
+                        {getLevelText(course.level)}
+                      </Badge>
+                      <Badge variant="outline" className="border-cyan-500/30 text-cyan-400">
+                        {course.category}
+                      </Badge>
+                    </div>
+
+                    {/* Lesson Content */}
+                    {currentLesson.content_md && (
+                      <div className="prose prose-invert max-w-none">
+                        <div className="bg-slate-800/50 p-4 rounded border border-slate-600">
+                          <h3 className="text-white mb-3">Nội dung bài học:</h3>
+                          <div className="text-slate-300 whitespace-pre-wrap">
+                            {currentLesson.content_md}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Attachment */}
-                  {currentLesson.attachment_url && (
-                    <div className="mt-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => window.open(currentLesson.attachment_url, '_blank')}
-                        className="border-slate-600 text-white hover:bg-slate-700"
-                      >
-                        <BookOpen className="w-4 h-4 mr-2" />
-                        Tải tài liệu
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-12 text-center">
-                <Play className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">Chọn bài học để bắt đầu</h3>
-                <p className="text-slate-400">Chọn một bài học từ danh sách bên cạnh</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sidebar - Course Structure */}
-      <div className="lg:col-span-1">
-        <Card className="glass border-slate-600 h-full">
-          <CardHeader>
-            <CardTitle className="text-white text-lg">{course.title}</CardTitle>
-            <div className="flex items-center justify-between text-sm text-slate-400">
-              <span className="flex items-center">
-                <Clock className="w-4 h-4 mr-1" />
-                {course.total_hours}h
-              </span>
-              <span className="flex items-center">
-                <BookOpen className="w-4 h-4 mr-1" />
-                {totalLessons} bài học
-              </span>
-            </div>
-            <Progress value={0} className="w-full" />
-          </CardHeader>
-          
-          <CardContent className="p-0">
-            <div className="max-h-[500px] overflow-y-auto">
-              {modules.map((module, moduleIndex) => (
-                <div key={module.id} className="border-b border-slate-600 last:border-b-0">
-                  <div className="p-4 bg-slate-800/30">
-                    <h4 className="font-semibold text-white text-sm">
-                      Module {moduleIndex + 1}: {module.title}
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {module.lessons.length} bài học
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    {module.lessons.map((lesson, lessonIndex) => (
-                      <button
-                        key={lesson.id}
-                        onClick={() => setCurrentLesson(lesson)}
-                        className={`w-full p-3 text-left transition-colors ${
-                          currentLesson?.id === lesson.id
-                            ? 'bg-purple-500/20 border-l-2 border-purple-500'
-                            : 'hover:bg-slate-700/50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="flex-shrink-0">
-                            {currentLesson?.id === lesson.id ? (
-                              <Play className="w-4 h-4 text-purple-400" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border border-slate-500 text-xs flex items-center justify-center text-slate-400">
-                                {lessonIndex + 1}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white font-medium truncate">
-                              {lesson.title}
-                            </p>
-                            {lesson.is_preview && (
-                              <Badge variant="outline" className="border-green-500/30 text-green-400 text-xs mt-1">
-                                Preview
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                    {/* Attachment */}
+                    {currentLesson.attachment_url && (
+                      <div className="mt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(currentLesson.attachment_url, '_blank')}
+                          className="border-slate-600 text-white hover:bg-slate-700"
+                        >
+                          <BookOpen className="w-4 h-4 mr-2" />
+                          Tải tài liệu
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="p-12 text-center">
+                  <Play className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Chọn bài học để bắt đầu</h3>
+                  <p className="text-slate-400">Chọn một bài học từ danh sách bên cạnh</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar - Course Structure */}
+        <div className="lg:col-span-1">
+          <Card className="glass border-slate-600 h-full">
+            <CardHeader>
+              <CardTitle className="text-white text-lg">{course.title}</CardTitle>
+              <div className="flex items-center justify-between text-sm text-slate-400">
+                <span className="flex items-center">
+                  <Clock className="w-4 h-4 mr-1" />
+                  {course.total_hours}h
+                </span>
+                <span className="flex items-center">
+                  <BookOpen className="w-4 h-4 mr-1" />
+                  {totalLessons} bài học
+                </span>
+              </div>
+              <Progress value={0} className="w-full" />
+            </CardHeader>
+            
+            <CardContent className="p-0">
+              <div className="max-h-[500px] overflow-y-auto">
+                {modules.map((module, moduleIndex) => (
+                  <div key={module.id} className="border-b border-slate-600 last:border-b-0">
+                    <div className="p-4 bg-slate-800/30">
+                      <h4 className="font-semibold text-white text-sm">
+                        Module {moduleIndex + 1}: {module.title}
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {module.lessons.length} bài học
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      {module.lessons.map((lesson, lessonIndex) => (
+                        <button
+                          key={lesson.id}
+                          onClick={() => setCurrentLesson(lesson)}
+                          className={`w-full p-3 text-left transition-colors ${
+                            currentLesson?.id === lesson.id
+                              ? 'bg-purple-500/20 border-l-2 border-purple-500'
+                              : 'hover:bg-slate-700/50'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-shrink-0">
+                              {currentLesson?.id === lesson.id ? (
+                                <Play className="w-4 h-4 text-purple-400" />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border border-slate-500 text-xs flex items-center justify-center text-slate-400">
+                                  {lessonIndex + 1}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white font-medium truncate">
+                                {lesson.title}
+                              </p>
+                              {lesson.is_preview && (
+                                <Badge variant="outline" className="border-green-500/30 text-green-400 text-xs mt-1">
+                                  Preview
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Comments Section */}
+      <CommentsSection courseId={course.id} />
     </div>
   );
 };

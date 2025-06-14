@@ -1,23 +1,24 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
+  Search, 
+  Filter, 
   BookOpen, 
-  Play, 
   Clock, 
   Users, 
-  Search,
-  Filter,
   Star,
-  CheckCircle
+  Play,
+  User,
+  TrendingUp
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { createSlug } from '@/utils/slugUtils';
 
 interface Course {
   id: string;
@@ -28,63 +29,35 @@ interface Course {
   level: number;
   total_hours: number;
   price: number;
-  is_public: boolean;
-  created_at: string;
-  lesson_count?: number;
 }
 
 const CourseHub = () => {
-  const navigate = useNavigate();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedLevel, setSelectedLevel] = useState('all');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchCourses();
   }, []);
 
+  useEffect(() => {
+    filterCourses();
+  }, [courses, searchTerm, selectedCategory, selectedLevel]);
+
   const fetchCourses = async () => {
     try {
-      // First fetch all public courses
-      const { data: coursesData, error: coursesError } = await supabase
+      const { data, error } = await supabase
         .from('courses')
         .select('*')
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
-      if (coursesError) throw coursesError;
-
-      // Then fetch lesson counts for each course through modules
-      const coursesWithLessonCount = await Promise.all(
-        (coursesData || []).map(async (course) => {
-          const { data: modulesData, error: modulesError } = await supabase
-            .from('modules')
-            .select(`
-              id,
-              lessons(count)
-            `)
-            .eq('course_id', course.id);
-
-          if (modulesError) {
-            console.error('Error fetching modules for course:', course.id, modulesError);
-            return { ...course, lesson_count: 0 };
-          }
-
-          // Calculate total lesson count across all modules
-          const totalLessons = modulesData?.reduce((total, module: any) => {
-            return total + (module.lessons?.[0]?.count || 0);
-          }, 0) || 0;
-
-          return {
-            ...course,
-            lesson_count: totalLessons
-          };
-        })
-      );
-
-      setCourses(coursesWithLessonCount);
+      if (error) throw error;
+      setCourses(data || []);
     } catch (error) {
       console.error('Error fetching courses:', error);
       toast({
@@ -97,29 +70,25 @@ const CourseHub = () => {
     }
   };
 
-  const categories = [
-    { id: 'all', name: 'Tất cả khóa học', count: courses.length },
-    ...Array.from(new Set(courses.map(course => course.category))).map(category => ({
-      id: category,
-      name: category,
-      count: courses.filter(course => course.category === category).length
-    }))
-  ];
+  const filterCourses = () => {
+    let filtered = courses;
 
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || course.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const getLevelBadgeVariant = (level: number) => {
-    switch (level) {
-      case 1: return 'secondary';
-      case 2: return 'default';
-      case 3: return 'destructive';
-      default: return 'secondary';
+    if (searchTerm) {
+      filtered = filtered.filter(course =>
+        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
+
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(course => course.category === selectedCategory);
+    }
+
+    if (selectedLevel !== 'all') {
+      filtered = filtered.filter(course => course.level === parseInt(selectedLevel));
+    }
+
+    setFilteredCourses(filtered);
   };
 
   const getLevelText = (level: number) => {
@@ -131,8 +100,18 @@ const CourseHub = () => {
     }
   };
 
-  const handleStartCourse = (courseId: string) => {
-    navigate(`/courses/${courseId}`);
+  const getLevelColor = (level: number) => {
+    switch (level) {
+      case 1: return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 2: return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 3: return 'bg-red-500/20 text-red-400 border-red-500/30';
+      default: return 'bg-green-500/20 text-green-400 border-green-500/30';
+    }
+  };
+
+  const getUniqueCategories = () => {
+    const categories = courses.map(course => course.category);
+    return [...new Set(categories)];
   };
 
   if (loading) {
@@ -147,124 +126,159 @@ const CourseHub = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Trung tâm khóa học</h1>
-          <p className="text-slate-600 dark:text-slate-400">Nâng cao kỹ năng với các khóa học chất lượng cao</p>
-        </div>
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+          Trung tâm Khóa học
+        </h1>
+        <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+          Khám phá những khóa học chất lượng cao được thiết kế để nâng cao kỹ năng và kiến thức của bạn
+        </p>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input 
-            placeholder="Tìm kiếm khóa học..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white dark:bg-slate-800"
-          />
-        </div>
+      {/* Stats Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="glass border-slate-600">
+          <CardContent className="p-6 text-center">
+            <BookOpen className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-white mb-2">{courses.length}</h3>
+            <p className="text-slate-400">Khóa học</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass border-slate-600">
+          <CardContent className="p-6 text-center">
+            <Users className="w-12 h-12 text-cyan-400 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-white mb-2">1,000+</h3>
+            <p className="text-slate-400">Học viên</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass border-slate-600">
+          <CardContent className="p-6 text-center">
+            <TrendingUp className="w-12 h-12 text-green-400 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-white mb-2">95%</h3>
+            <p className="text-slate-400">Hài lòng</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Categories */}
-      <div className="flex flex-wrap gap-2">
-        {categories.map((category) => (
-          <Button
-            key={category.id}
-            variant={selectedCategory === category.id ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory(category.id)}
-            className={selectedCategory === category.id ? 
-              "bg-gradient-to-r from-blue-500 to-purple-600" : ""
-            }
-          >
-            {category.name} ({category.count})
-          </Button>
-        ))}
-      </div>
+      {/* Filters */}
+      <Card className="glass border-slate-600">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm kiếm khóa học..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-slate-800/50 border-slate-600 text-white"
+                />
+              </div>
+            </div>
+            
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full md:w-48 bg-slate-800/50 border-slate-600 text-white">
+                <SelectValue placeholder="Danh mục" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem value="all" className="text-white hover:bg-slate-700">Tất cả danh mục</SelectItem>
+                {getUniqueCategories().map((category) => (
+                  <SelectItem key={category} value={category} className="text-white hover:bg-slate-700">
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+              <SelectTrigger className="w-full md:w-48 bg-slate-800/50 border-slate-600 text-white">
+                <SelectValue placeholder="Cấp độ" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem value="all" className="text-white hover:bg-slate-700">Tất cả cấp độ</SelectItem>
+                <SelectItem value="1" className="text-white hover:bg-slate-700">Cơ bản</SelectItem>
+                <SelectItem value="2" className="text-white hover:bg-slate-700">Trung cấp</SelectItem>
+                <SelectItem value="3" className="text-white hover:bg-slate-700">Nâng cao</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Course Grid */}
-      {filteredCourses.length === 0 ? (
-        <div className="text-center py-12">
-          <BookOpen className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-            {courses.length === 0 ? 'Chưa có khóa học nào' : 'Không tìm thấy khóa học'}
-          </h3>
-          <p className="text-slate-600 dark:text-slate-400">
-            {courses.length === 0 
-              ? 'Hãy quay lại sau khi có khóa học mới được thêm vào'
-              : 'Thử thay đổi từ khóa tìm kiếm hoặc danh mục'
-            }
-          </p>
-        </div>
-      ) : (
+      {/* Courses Grid */}
+      {filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCourses.map((course) => (
-            <Card key={course.id} className="bg-white dark:bg-slate-800 hover:shadow-lg transition-shadow overflow-hidden group">
-              <div className="relative">
-                <div className="w-full h-48 bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center overflow-hidden">
-                  {course.thumbnail_url ? (
+            <Card key={course.id} className="glass border-slate-600 hover:border-purple-500/50 transition-all duration-300 group">
+              <CardHeader>
+                {course.thumbnail_url ? (
+                  <div className="aspect-video rounded-lg overflow-hidden mb-4">
                     <img
                       src={course.thumbnail_url}
                       alt={course.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                  ) : (
-                    <Play className="w-12 h-12 text-white bg-black/30 rounded-full p-3 group-hover:scale-110 transition-transform" />
-                  )}
+                  </div>
+                ) : (
+                  <div className="aspect-video bg-gradient-to-br from-purple-500/20 to-cyan-500/20 rounded-lg flex items-center justify-center mb-4">
+                    <BookOpen className="w-16 h-16 text-white/50" />
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="border-cyan-500/30 text-cyan-400">
+                      {course.category}
+                    </Badge>
+                    <Badge variant="outline" className={getLevelColor(course.level)}>
+                      {getLevelText(course.level)}
+                    </Badge>
+                  </div>
+                  
+                  <CardTitle className="text-white group-hover:text-purple-400 transition-colors">
+                    {course.title}
+                  </CardTitle>
                 </div>
-                <Badge 
-                  className="absolute top-2 left-2" 
-                  variant={getLevelBadgeVariant(course.level)}
-                >
-                  {getLevelText(course.level)}
-                </Badge>
-              </div>
-
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg line-clamp-2">{course.title}</CardTitle>
-                </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
-                  {course.description}
-                </p>
               </CardHeader>
-
+              
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-                  <div className="flex items-center">
+                <p className="text-slate-400 text-sm line-clamp-3">
+                  {course.description || 'Chưa có mô tả'}
+                </p>
+                
+                <div className="flex items-center justify-between text-sm text-slate-400">
+                  <span className="flex items-center">
                     <Clock className="w-4 h-4 mr-1" />
-                    {course.total_hours}h
-                  </div>
-                  <div className="flex items-center">
-                    <BookOpen className="w-4 h-4 mr-1" />
-                    {course.lesson_count} bài học
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-lg font-semibold text-cyan-400">
-                    {course.price === 0 ? 'Miễn phí' : `${course.price.toLocaleString()}đ`}
+                    {course.total_hours || 0}h
                   </span>
-                  <Button 
-                    size="sm" 
-                    className="bg-gradient-to-r from-blue-500 to-purple-600"
-                    onClick={() => handleStartCourse(course.id)}
-                  >
-                    Bắt đầu học
-                  </Button>
+                  <span className="flex items-center">
+                    <User className="w-4 h-4 mr-1" />
+                    Miễn phí
+                  </span>
                 </div>
                 
-                <Badge variant="outline" className="border-purple-500/30 text-purple-400 w-fit">
-                  {course.category}
-                </Badge>
+                <Link to={`/course/${createSlug(course.title)}`}>
+                  <Button className="w-full bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 group">
+                    <Play className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                    Bắt đầu học
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           ))}
         </div>
+      ) : (
+        <Card className="glass border-slate-600">
+          <CardContent className="p-12 text-center">
+            <Search className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Không tìm thấy khóa học</h3>
+            <p className="text-slate-400">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
