@@ -20,10 +20,12 @@ import {
   MessageCircle,
   FileText,
   Trophy,
-  Folder
+  Folder,
+  Monitor
 } from 'lucide-react';
 import { useLandingPage } from '@/contexts/LandingPageContext';
 import { useToast } from '@/hooks/use-toast';
+import LandingPagePreview from '@/components/admin/LandingPagePreview';
 
 const AdminLandingPage = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -115,366 +117,192 @@ const AdminLandingPage = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="hero" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 bg-slate-800/50">
-          <TabsTrigger value="hero" className="data-[state=active]:bg-purple-500/20">
-            <Type className="w-4 h-4 mr-2" />
-            Hero Section
-          </TabsTrigger>
-          <TabsTrigger value="about" className="data-[state=active]:bg-purple-500/20">
-            <Globe className="w-4 h-4 mr-2" />
-            About Section
-          </TabsTrigger>
-          <TabsTrigger value="preview" className="data-[state=active]:bg-purple-500/20">
-            <Eye className="w-4 h-4 mr-2" />
-            Preview Tabs
-          </TabsTrigger>
-          <TabsTrigger value="ai" className="data-[state=active]:bg-purple-500/20">
-            <Star className="w-4 h-4 mr-2" />
-            AI Helper
-          </TabsTrigger>
-        </TabsList>
+      {/* Main Content with Preview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Editor Section */}
+        <div className="lg:col-span-2">
+          <Tabs defaultValue="hero" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4 bg-slate-800/50">
+              <TabsTrigger value="hero" className="data-[state=active]:bg-purple-500/20">
+                <Type className="w-4 h-4 mr-2" />
+                Hero
+              </TabsTrigger>
+              <TabsTrigger value="about" className="data-[state=active]:bg-purple-500/20">
+                <Globe className="w-4 h-4 mr-2" />
+                About
+              </TabsTrigger>
+              <TabsTrigger value="preview" className="data-[state=active]:bg-purple-500/20">
+                <Eye className="w-4 h-4 mr-2" />
+                Tabs
+              </TabsTrigger>
+              <TabsTrigger value="ai" className="data-[state=active]:bg-purple-500/20">
+                <Star className="w-4 h-4 mr-2" />
+                AI Helper
+              </TabsTrigger>
+            </TabsList>
 
-        {/* Hero Section */}
-        <TabsContent value="hero">
-          <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Type className="w-5 h-5 text-purple-400" />
-                <span>Hero Section</span>
-                <Badge className="bg-purple-500/20 text-purple-300">Phần đầu trang</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+            {/* Hero Section */}
+            <TabsContent value="hero">
+              <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Type className="w-5 h-5 text-purple-400" />
+                    <span>Hero Section</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề chính</label>
+                      <Input
+                        value={heroData.title}
+                        onChange={(e) => setHeroData({...heroData, title: e.target.value})}
+                        disabled={!isEditing}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề phụ</label>
+                      <Input
+                        value={heroData.subtitle}
+                        onChange={(e) => setHeroData({...heroData, subtitle: e.target.value})}
+                        disabled={!isEditing}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-2 block">Mô tả</label>
+                      <Textarea
+                        value={heroData.description}
+                        onChange={(e) => setHeroData({...heroData, description: e.target.value})}
+                        disabled={!isEditing}
+                        rows={3}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-slate-300 mb-2 block">Nút chính</label>
+                        <Input
+                          value={heroData.primaryButton}
+                          onChange={(e) => setHeroData({...heroData, primaryButton: e.target.value})}
+                          disabled={!isEditing}
+                          className="bg-slate-700/50 border-slate-600 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-300 mb-2 block">Nút phụ</label>
+                        <Input
+                          value={heroData.secondaryButton}
+                          onChange={(e) => setHeroData({...heroData, secondaryButton: e.target.value})}
+                          disabled={!isEditing}
+                          className="bg-slate-700/50 border-slate-600 text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-4 block">Thống kê</label>
+                      <div className="grid grid-cols-2 gap-4">
+                        {stats.map((stat, index) => (
+                          <div key={index} className="space-y-2">
+                            <Input
+                              value={stat.number}
+                              onChange={(e) => {
+                                const newStats = [...stats];
+                                newStats[index].number = e.target.value;
+                                setStats(newStats);
+                              }}
+                              disabled={!isEditing}
+                              placeholder="Số liệu"
+                              className="bg-slate-700/50 border-slate-600 text-white"
+                            />
+                            <Input
+                              value={stat.label}
+                              onChange={(e) => {
+                                const newStats = [...stats];
+                                newStats[index].label = e.target.value;
+                                setStats(newStats);
+                              }}
+                              disabled={!isEditing}
+                              placeholder="Nhãn"
+                              className="bg-slate-700/50 border-slate-600 text-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* About Section */}
+            <TabsContent value="about">
+              <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Globe className="w-5 h-5 text-purple-400" />
+                    <span>About Section</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
                   <div>
-                    <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề chính</label>
+                    <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề</label>
                     <Input
-                      value={heroData.title}
-                      onChange={(e) => setHeroData({...heroData, title: e.target.value})}
+                      value={aboutData.title}
+                      onChange={(e) => setAboutData({...aboutData, title: e.target.value})}
                       disabled={!isEditing}
                       className="bg-slate-700/50 border-slate-600 text-white"
                     />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề phụ</label>
-                    <Input
-                      value={heroData.subtitle}
-                      onChange={(e) => setHeroData({...heroData, subtitle: e.target.value})}
-                      disabled={!isEditing}
-                      className="bg-slate-700/50 border-slate-600 text-white"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium text-slate-300 mb-2 block">Mô tả</label>
                     <Textarea
-                      value={heroData.description}
-                      onChange={(e) => setHeroData({...heroData, description: e.target.value})}
+                      value={aboutData.description}
+                      onChange={(e) => setAboutData({...aboutData, description: e.target.value})}
                       disabled={!isEditing}
-                      rows={4}
+                      rows={3}
                       className="bg-slate-700/50 border-slate-600 text-white"
                     />
                   </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-300 mb-2 block">Nút chính</label>
-                  <Input
-                    value={heroData.primaryButton}
-                    onChange={(e) => setHeroData({...heroData, primaryButton: e.target.value})}
-                    disabled={!isEditing}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-300 mb-2 block">Nút phụ</label>
-                  <Input
-                    value={heroData.secondaryButton}
-                    onChange={(e) => setHeroData({...heroData, secondaryButton: e.target.value})}
-                    disabled={!isEditing}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
-              </div>
 
-              {/* Stats */}
-              <div>
-                <label className="text-sm font-medium text-slate-300 mb-4 block">Thống kê hiển thị</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {stats.map((stat, index) => (
-                    <Card key={index} className="bg-slate-700/50 border-slate-600">
-                      <CardContent className="p-4">
-                        <Input
-                          value={stat.number}
-                          onChange={(e) => {
-                            const newStats = [...stats];
-                            newStats[index].number = e.target.value;
-                            setStats(newStats);
-                          }}
-                          disabled={!isEditing}
-                          className="bg-slate-600/50 border-slate-500 text-white text-center font-bold mb-2"
-                        />
-                        <Input
-                          value={stat.label}
-                          onChange={(e) => {
-                            const newStats = [...stats];
-                            newStats[index].label = e.target.value;
-                            setStats(newStats);
-                          }}
-                          disabled={!isEditing}
-                          className="bg-slate-600/50 border-slate-500 text-white text-center text-sm"
-                        />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* About Section */}
-        <TabsContent value="about">
-          <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Globe className="w-5 h-5 text-purple-400" />
-                <span>About Section</span>
-                <Badge className="bg-purple-500/20 text-purple-300">Giới thiệu</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề</label>
-                  <Input
-                    value={aboutData.title}
-                    onChange={(e) => setAboutData({...aboutData, title: e.target.value})}
-                    disabled={!isEditing}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-300 mb-2 block">Mô tả</label>
-                  <Textarea
-                    value={aboutData.description}
-                    onChange={(e) => setAboutData({...aboutData, description: e.target.value})}
-                    disabled={!isEditing}
-                    rows={3}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <label className="text-sm font-medium text-slate-300">Tính năng nổi bật</label>
-                  {isEditing && (
-                    <Button
-                      size="sm"
-                      onClick={() => setAboutData({...aboutData, features: [...aboutData.features, 'Tính năng mới']})}
-                      className="bg-green-500/20 border border-green-500/50 text-green-300 hover:bg-green-500/30"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Thêm tính năng
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-3">
-                  {aboutData.features.map((feature, index) => (
-                    <div key={index} className="flex items-center space-x-3">
-                      <span className="text-purple-400 font-bold">🚀</span>
-                      <Input
-                        value={feature}
-                        onChange={(e) => {
-                          const newFeatures = [...aboutData.features];
-                          newFeatures[index] = e.target.value;
-                          setAboutData({...aboutData, features: newFeatures});
-                        }}
-                        disabled={!isEditing}
-                        className="bg-slate-700/50 border-slate-600 text-white flex-1"
-                      />
-                      {isEditing && aboutData.features.length > 1 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="text-sm font-medium text-slate-300">Tính năng nổi bật</label>
+                      {isEditing && (
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const newFeatures = aboutData.features.filter((_, i) => i !== index);
-                            setAboutData({...aboutData, features: newFeatures});
-                          }}
-                          className="border-red-500/50 text-red-300 hover:bg-red-500/10"
+                          onClick={() => setAboutData({...aboutData, features: [...aboutData.features, 'Tính năng mới']})}
+                          className="bg-green-500/20 border border-green-500/50 text-green-300 hover:bg-green-500/30"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Plus className="w-4 h-4 mr-1" />
+                          Thêm
                         </Button>
                       )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Preview Tabs */}
-        <TabsContent value="preview">
-          <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Eye className="w-5 h-5 text-purple-400" />
-                <span>Preview Tabs</span>
-                <Badge className="bg-purple-500/20 text-purple-300">Xem trước</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {previewTabs.map((tab, index) => {
-                  const IconComponent = iconMap[tab.icon as keyof typeof iconMap] || BookOpen;
-                  return (
-                    <Card key={index} className="bg-slate-700/50 border-slate-600">
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center space-x-3">
-                          <IconComponent className="w-5 h-5 text-purple-400" />
+                    <div className="space-y-3">
+                      {aboutData.features.map((feature, index) => (
+                        <div key={index} className="flex items-center space-x-3">
+                          <span className="text-purple-400">🚀</span>
                           <Input
-                            value={tab.name}
+                            value={feature}
                             onChange={(e) => {
-                              const newTabs = [...previewTabs];
-                              newTabs[index].name = e.target.value;
-                              setPreviewTabs(newTabs);
+                              const newFeatures = [...aboutData.features];
+                              newFeatures[index] = e.target.value;
+                              setAboutData({...aboutData, features: newFeatures});
                             }}
                             disabled={!isEditing}
-                            className="bg-slate-600/50 border-slate-500 text-white flex-1"
+                            className="bg-slate-700/50 border-slate-600 text-white flex-1"
                           />
-                        </div>
-                        <Textarea
-                          value={tab.description}
-                          onChange={(e) => {
-                            const newTabs = [...previewTabs];
-                            newTabs[index].description = e.target.value;
-                            setPreviewTabs(newTabs);
-                          }}
-                          disabled={!isEditing}
-                          rows={2}
-                          className="bg-slate-600/50 border-slate-500 text-white text-sm"
-                        />
-                        <Input
-                          value={tab.preview}
-                          onChange={(e) => {
-                            const newTabs = [...previewTabs];
-                            newTabs[index].preview = e.target.value;
-                            setPreviewTabs(newTabs);
-                          }}
-                          disabled={!isEditing}
-                          placeholder="Preview text"
-                          className="bg-slate-600/50 border-slate-500 text-white text-sm"
-                        />
-                        <Input
-                          value={tab.stats}
-                          onChange={(e) => {
-                            const newTabs = [...previewTabs];
-                            newTabs[index].stats = e.target.value;
-                            setPreviewTabs(newTabs);
-                          }}
-                          disabled={!isEditing}
-                          placeholder="Stats"
-                          className="bg-slate-600/50 border-slate-500 text-white text-sm"
-                        />
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* AI Helper */}
-        <TabsContent value="ai">
-          <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Star className="w-5 h-5 text-purple-400" />
-                <span>AI Helper Box</span>
-                <Badge className="bg-purple-500/20 text-purple-300">Trợ lý AI</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề chính</label>
-                    <Input
-                      value={aiHelperData.title}
-                      onChange={(e) => setAIHelperData({...aiHelperData, title: e.target.value})}
-                      disabled={!isEditing}
-                      className="bg-slate-700/50 border-slate-600 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-300 mb-2 block">Badge subtitle</label>
-                    <Input
-                      value={aiHelperData.subtitle}
-                      onChange={(e) => setAIHelperData({...aiHelperData, subtitle: e.target.value})}
-                      disabled={!isEditing}
-                      className="bg-slate-700/50 border-slate-600 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-300 mb-2 block">Text nút CTA</label>
-                    <Input
-                      value={aiHelperData.buttonText}
-                      onChange={(e) => setAIHelperData({...aiHelperData, buttonText: e.target.value})}
-                      disabled={!isEditing}
-                      className="bg-slate-700/50 border-slate-600 text-white"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-300 mb-2 block">Mô tả</label>
-                  <Textarea
-                    value={aiHelperData.description}
-                    onChange={(e) => setAIHelperData({...aiHelperData, description: e.target.value})}
-                    disabled={!isEditing}
-                    rows={6}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <label className="text-sm font-medium text-slate-300">Demo Messages</label>
-                  {isEditing && (
-                    <Button
-                      size="sm"
-                      onClick={() => setAIHelperData({
-                        ...aiHelperData, 
-                        demoMessages: [...aiHelperData.demoMessages, { question: 'Câu hỏi mới?', answer: 'Câu trả lời mới...' }]
-                      })}
-                      className="bg-green-500/20 border border-green-500/50 text-green-300 hover:bg-green-500/30"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Thêm demo
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-4">
-                  {aiHelperData.demoMessages.map((message, index) => (
-                    <Card key={index} className="bg-slate-700/50 border-slate-600">
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <span className="text-sm font-medium text-purple-300">Demo {index + 1}</span>
-                          {isEditing && aiHelperData.demoMessages.length > 1 && (
+                          {isEditing && aboutData.features.length > 1 && (
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                const newMessages = aiHelperData.demoMessages.filter((_, i) => i !== index);
-                                setAIHelperData({...aiHelperData, demoMessages: newMessages});
+                                const newFeatures = aboutData.features.filter((_, i) => i !== index);
+                                setAboutData({...aboutData, features: newFeatures});
                               }}
                               className="border-red-500/50 text-red-300 hover:bg-red-500/10"
                             >
@@ -482,42 +310,233 @@ const AdminLandingPage = () => {
                             </Button>
                           )}
                         </div>
-                        <div>
-                          <label className="text-xs text-slate-400">Câu hỏi:</label>
-                          <Input
-                            value={message.question}
-                            onChange={(e) => {
-                              const newMessages = [...aiHelperData.demoMessages];
-                              newMessages[index].question = e.target.value;
-                              setAIHelperData({...aiHelperData, demoMessages: newMessages});
-                            }}
-                            disabled={!isEditing}
-                            className="bg-slate-600/50 border-slate-500 text-white text-sm mt-1"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-slate-400">Câu trả lời:</label>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Preview Tabs */}
+            <TabsContent value="preview">
+              <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Eye className="w-5 h-5 text-purple-400" />
+                    <span>Preview Tabs</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {previewTabs.map((tab, index) => (
+                      <Card key={index} className="bg-slate-700/50 border-slate-600">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <Input
+                              value={tab.name}
+                              onChange={(e) => {
+                                const newTabs = [...previewTabs];
+                                newTabs[index].name = e.target.value;
+                                setPreviewTabs(newTabs);
+                              }}
+                              disabled={!isEditing}
+                              placeholder="Tên tab"
+                              className="bg-slate-600/50 border-slate-500 text-white"
+                            />
+                            <Input
+                              value={tab.stats}
+                              onChange={(e) => {
+                                const newTabs = [...previewTabs];
+                                newTabs[index].stats = e.target.value;
+                                setPreviewTabs(newTabs);
+                              }}
+                              disabled={!isEditing}
+                              placeholder="Thống kê"
+                              className="bg-slate-600/50 border-slate-500 text-white"
+                            />
+                          </div>
                           <Textarea
-                            value={message.answer}
+                            value={tab.description}
                             onChange={(e) => {
-                              const newMessages = [...aiHelperData.demoMessages];
-                              newMessages[index].answer = e.target.value;
-                              setAIHelperData({...aiHelperData, demoMessages: newMessages});
+                              const newTabs = [...previewTabs];
+                              newTabs[index].description = e.target.value;
+                              setPreviewTabs(newTabs);
                             }}
                             disabled={!isEditing}
                             rows={2}
-                            className="bg-slate-600/50 border-slate-500 text-white text-sm mt-1"
+                            placeholder="Mô tả"
+                            className="bg-slate-600/50 border-slate-500 text-white"
                           />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                          <Input
+                            value={tab.preview}
+                            onChange={(e) => {
+                              const newTabs = [...previewTabs];
+                              newTabs[index].preview = e.target.value;
+                              setPreviewTabs(newTabs);
+                            }}
+                            disabled={!isEditing}
+                            placeholder="Nội dung preview"
+                            className="bg-slate-600/50 border-slate-500 text-white"
+                          />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* AI Helper */}
+            <TabsContent value="ai">
+              <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Star className="w-5 h-5 text-purple-400" />
+                    <span>AI Helper Box</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-2 block">Tiêu đề chính</label>
+                      <Input
+                        value={aiHelperData.title}
+                        onChange={(e) => setAIHelperData({...aiHelperData, title: e.target.value})}
+                        disabled={!isEditing}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-2 block">Badge subtitle</label>
+                      <Input
+                        value={aiHelperData.subtitle}
+                        onChange={(e) => setAIHelperData({...aiHelperData, subtitle: e.target.value})}
+                        disabled={!isEditing}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-2 block">Mô tả</label>
+                      <Textarea
+                        value={aiHelperData.description}
+                        onChange={(e) => setAIHelperData({...aiHelperData, description: e.target.value})}
+                        disabled={!isEditing}
+                        rows={3}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-300 mb-2 block">Text nút CTA</label>
+                      <Input
+                        value={aiHelperData.buttonText}
+                        onChange={(e) => setAIHelperData({...aiHelperData, buttonText: e.target.value})}
+                        disabled={!isEditing}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="text-sm font-medium text-slate-300">Demo Messages</label>
+                      {isEditing && (
+                        <Button
+                          size="sm"
+                          onClick={() => setAIHelperData({
+                            ...aiHelperData, 
+                            demoMessages: [...aiHelperData.demoMessages, { question: 'Câu hỏi mới?', answer: 'Câu trả lời mới...' }]
+                          })}
+                          className="bg-green-500/20 border border-green-500/50 text-green-300 hover:bg-green-500/30"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Thêm
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-4">
+                      {aiHelperData.demoMessages.map((message, index) => (
+                        <Card key={index} className="bg-slate-700/50 border-slate-600">
+                          <CardContent className="p-4 space-y-3">
+                            <div className="flex items-start justify-between">
+                              <span className="text-sm font-medium text-purple-300">Demo {index + 1}</span>
+                              {isEditing && aiHelperData.demoMessages.length > 1 && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const newMessages = aiHelperData.demoMessages.filter((_, i) => i !== index);
+                                    setAIHelperData({...aiHelperData, demoMessages: newMessages});
+                                  }}
+                                  className="border-red-500/50 text-red-300 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-400">Câu hỏi:</label>
+                              <Input
+                                value={message.question}
+                                onChange={(e) => {
+                                  const newMessages = [...aiHelperData.demoMessages];
+                                  newMessages[index].question = e.target.value;
+                                  setAIHelperData({...aiHelperData, demoMessages: newMessages});
+                                }}
+                                disabled={!isEditing}
+                                className="bg-slate-600/50 border-slate-500 text-white text-sm mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-400">Câu trả lời:</label>
+                              <Textarea
+                                value={message.answer}
+                                onChange={(e) => {
+                                  const newMessages = [...aiHelperData.demoMessages];
+                                  newMessages[index].answer = e.target.value;
+                                  setAIHelperData({...aiHelperData, demoMessages: newMessages});
+                                }}
+                                disabled={!isEditing}
+                                rows={2}
+                                className="bg-slate-600/50 border-slate-500 text-white text-sm mt-1"
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Preview Section */}
+        <div className="lg:col-span-1">
+          <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700 sticky top-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center space-x-2 text-white">
+                <Monitor className="w-5 h-5 text-purple-400" />
+                <span>Preview Real-time</span>
+                <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-xs">
+                  Live
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="h-[600px] border border-slate-600 rounded-lg overflow-hidden">
+                <LandingPagePreview
+                  heroData={heroData}
+                  aboutData={aboutData}
+                  stats={stats}
+                  previewTabs={previewTabs}
+                  aiHelperData={aiHelperData}
+                />
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 };
