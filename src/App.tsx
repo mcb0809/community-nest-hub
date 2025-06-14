@@ -11,6 +11,7 @@ import CommunityChat from "./pages/CommunityChat";
 import EventHub from "./pages/EventHub";
 import DocumentationCenter from "./pages/DocumentationCenter";
 import Members from "./pages/Members";
+import CourseAdmin from "./pages/admin/CourseAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/events" element={<EventHub />} />
             <Route path="/documents" element={<DocumentationCenter />} />
             <Route path="/members" element={<Members />} />
+            <Route path="/admin/course" element={<CourseAdmin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Web3DashboardLayout>
