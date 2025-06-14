@@ -4,6 +4,7 @@ import { Bell, Search, Menu, Sun, Moon, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import Web3ProfileDropdown from './Web3ProfileDropdown';
 
 const Web3Header = ({ 
   toggleSidebar, 
@@ -67,9 +68,7 @@ const Web3Header = ({
           </span>
         </Button>
         
-        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-xl flex items-center justify-center neon-purple">
-          <span className="text-white text-sm font-semibold">A</span>
-        </div>
+        <Web3ProfileDropdown />
         
         {/* Level indicator */}
         <div className="hidden sm:flex flex-col items-end">
