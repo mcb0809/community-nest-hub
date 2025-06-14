@@ -36,6 +36,33 @@ export type Database = {
         }
         Relationships: []
       }
+      channels: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           content: string
@@ -202,6 +229,54 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          channel_id: string | null
+          content: string
+          created_at: string | null
+          id: string
+          reactions: Json | null
+          reply_to: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          channel_id?: string | null
+          content: string
+          created_at?: string | null
+          id?: string
+          reactions?: Json | null
+          reply_to?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          channel_id?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          reactions?: Json | null
+          reply_to?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modules: {
         Row: {
           course_id: string | null
@@ -264,6 +339,33 @@ export type Database = {
           id?: string
           platform?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string
+          id: string
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name: string
+          id: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          role?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }

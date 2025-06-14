@@ -1,135 +1,75 @@
 
 import React, { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { 
   Hash, 
   Users,
   Settings,
   Search,
-  Bell
+  Bell,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
-
-interface Message {
-  id: number;
-  user: string;
-  avatar: string;
-  message: string;
-  timestamp: string;
-  role: 'admin' | 'vip' | 'member';
-  replyTo?: {
-    user: string;
-    message: string;
-  };
-  reactions?: {
-    emoji: string;
-    count: number;
-    users: string[];
-  }[];
-}
+import { useAuth } from '@/hooks/useAuth';
+import { useChat } from '@/hooks/useChat';
 
 const CommunityChat = () => {
-  const [selectedChannel, setSelectedChannel] = useState('general');
-  const [replyTo, setReplyTo] = useState<{user: string; message: string} | undefined>();
+  const { user, signOut, loading: authLoading } = useAuth();
+  const {
+    channels,
+    messages,
+    selectedChannel,
+    setSelectedChannel,
+    loading: chatLoading,
+    sendMessage,
+    createChannel,
+    updateChannelReaction,
+  } = useChat();
+  
+  const [replyTo, setReplyTo] = useState<{
+    messageId: string;
+    user: string;
+    message: string;
+  } | undefined>();
 
-  const channels = [
-    { id: 'general', name: 'general', description: 'General discussion', members: 156 },
-    { id: 'frontend', name: 'frontend', description: 'Frontend development', members: 89 },
-    { id: 'backend', name: 'backend', description: 'Backend development', members: 67 },
-    { id: 'ai-automation', name: 'ai-automation', description: 'AI & Automation', members: 234 },
-    { id: 'random', name: 'random', description: 'Random discussions', members: 45 },
-  ];
+  // Redirect to auth if not logged in
+  if (!authLoading && !user) {
+    return <Navigate to="/auth" replace />;
+  }
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      user: 'John Smith',
-      avatar: '/api/placeholder/32/32',
-      message: 'Hey everyone! Just finished the React automation course. Amazing content! 🚀',
-      timestamp: '2:30 PM',
-      role: 'admin',
-      reactions: [
-        { emoji: '👍', count: 5, users: ['Alice', 'Bob'] },
-        { emoji: '🚀', count: 2, users: ['Charlie'] }
-      ]
-    },
-    {
-      id: 2,
-      user: 'Sarah Johnson',
-      avatar: '/api/placeholder/32/32',
-      message: 'Congratulations! How long did it take you to complete?',
-      timestamp: '2:35 PM',
-      role: 'vip',
-      replyTo: {
-        user: 'John Smith',
-        message: 'Hey everyone! Just finished the React automation course...'
-      }
-    },
-    {
-      id: 3,
-      user: 'Mike Davis',
-      avatar: '/api/placeholder/32/32',
-      message: 'I\'m working on the same course. The AI integration part is fascinating! Anyone has tips for the advanced modules?',
-      timestamp: '2:40 PM',
-      role: 'member',
-      reactions: [
-        { emoji: '💯', count: 3, users: ['Sarah', 'Alex'] }
-      ]
-    },
-  ]);
+  if (authLoading || chatLoading) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900/10 to-slate-900">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
 
   const currentChannel = channels.find(c => c.id === selectedChannel);
 
   const handleSendMessage = (message: string) => {
-    const newMessage: Message = {
-      id: messages.length + 1,
-      user: 'AI Learner',
-      avatar: '/api/placeholder/32/32',
-      message,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      role: 'member',
-      replyTo: replyTo ? replyTo : undefined
-    };
-    
-    setMessages([...messages, newMessage]);
+    sendMessage(message, replyTo?.messageId);
     setReplyTo(undefined);
   };
 
-  const handleReply = (message: Message) => {
+  const handleReply = (message: any) => {
     setReplyTo({
-      user: message.user,
-      message: message.message
+      messageId: message.id,
+      user: message.user_profiles?.display_name || 'Unknown User',
+      message: message.content
     });
   };
 
-  const handleReact = (messageId: number, emoji: string) => {
-    setMessages(messages.map(msg => {
-      if (msg.id === messageId) {
-        const existingReaction = msg.reactions?.find(r => r.emoji === emoji);
-        if (existingReaction) {
-          return {
-            ...msg,
-            reactions: msg.reactions?.map(r => 
-              r.emoji === emoji 
-                ? { ...r, count: r.count + 1, users: [...r.users, 'You'] }
-                : r
-            )
-          };
-        } else {
-          return {
-            ...msg,
-            reactions: [
-              ...(msg.reactions || []),
-              { emoji, count: 1, users: ['You'] }
-            ]
-          };
-        }
-      }
-      return msg;
-    }));
+  const handleReact = (messageId: string, emoji: string) => {
+    updateChannelReaction(messageId, emoji);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   return (
@@ -139,6 +79,7 @@ const CommunityChat = () => {
         channels={channels}
         selectedChannel={selectedChannel}
         onChannelSelect={setSelectedChannel}
+        onCreateChannel={createChannel}
       />
 
       {/* Main Chat Area */}
@@ -159,11 +100,12 @@ const CommunityChat = () => {
             </div>
             <Badge className="bg-gradient-to-r from-purple-500/20 to-cyan-500/20 text-purple-300 border-purple-500/30">
               <Users className="w-3 h-3 mr-1" />
-              {currentChannel?.members}
+              {messages.length}
             </Badge>
           </div>
           
           <div className="flex items-center space-x-2">
+            <span className="text-sm text-slate-300">{user?.email}</span>
             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
               <Bell className="w-4 h-4" />
             </Button>
@@ -172,6 +114,14 @@ const CommunityChat = () => {
             </Button>
             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
               <Settings className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleSignOut}
+              className="text-slate-400 hover:text-red-400 hover:bg-red-500/20"
+            >
+              <LogOut className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -182,9 +132,28 @@ const CommunityChat = () => {
             {messages.map((message) => (
               <MessageBubble
                 key={message.id}
-                message={message}
+                message={{
+                  id: message.id,
+                  user: message.user_profiles?.display_name || 'Unknown User',
+                  avatar: message.user_profiles?.avatar_url || '/api/placeholder/32/32',
+                  message: message.content,
+                  timestamp: new Date(message.created_at).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  }),
+                  role: message.user_profiles?.role as 'admin' | 'vip' | 'member' || 'member',
+                  replyTo: message.reply_message ? {
+                    user: message.reply_message.user_profiles?.display_name || 'Unknown User',
+                    message: message.reply_message.content
+                  } : undefined,
+                  reactions: Object.entries(message.reactions || {}).map(([emoji, users]) => ({
+                    emoji,
+                    count: (users as string[]).length,
+                    users: users as string[]
+                  }))
+                }}
                 onReply={handleReply}
-                onReact={handleReact}
+                onReact={(messageId, emoji) => handleReact(messageId, emoji)}
               />
             ))}
           </div>
@@ -192,9 +161,12 @@ const CommunityChat = () => {
 
         {/* Chat Input */}
         <ChatInput
-          selectedChannel={selectedChannel}
+          selectedChannel={currentChannel?.name || ''}
           onSendMessage={handleSendMessage}
-          replyTo={replyTo}
+          replyTo={replyTo ? {
+            user: replyTo.user,
+            message: replyTo.message
+          } : undefined}
           onCancelReply={() => setReplyTo(undefined)}
         />
       </div>

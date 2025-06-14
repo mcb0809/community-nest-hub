@@ -1,26 +1,19 @@
 
 import React from 'react';
-import { Hash, Plus, Users } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Hash, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import ChannelItem from './ChannelItem';
-
-interface Channel {
-  id: string;
-  name: string;
-  description: string;
-  members: number;
-  icon?: string;
-}
+import CreateChannelModal from './CreateChannelModal';
+import { Channel } from '@/hooks/useChat';
 
 interface ChatSidebarProps {
   channels: Channel[];
   selectedChannel: string;
   onChannelSelect: (channelId: string) => void;
+  onCreateChannel: (name: string, description: string) => void;
 }
 
-const ChatSidebar = ({ channels, selectedChannel, onChannelSelect }: ChatSidebarProps) => {
+const ChatSidebar = ({ channels, selectedChannel, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {
   return (
     <div className="w-80 glass-card border-r border-purple-500/20 flex flex-col">
       {/* Header */}
@@ -32,18 +25,12 @@ const ChatSidebar = ({ channels, selectedChannel, onChannelSelect }: ChatSidebar
           <div className="flex items-center space-x-1">
             <Users className="w-4 h-4 text-purple-400" />
             <Badge className="bg-gradient-to-r from-purple-500/20 to-cyan-500/20 text-purple-300 border-purple-500/30">
-              {channels.reduce((sum, channel) => sum + channel.members, 0)}
+              {channels.length}
             </Badge>
           </div>
         </div>
         
-        <Button 
-          className="w-full bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 neon-purple transition-all duration-300"
-          size="sm"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Channel
-        </Button>
+        <CreateChannelModal onCreateChannel={onCreateChannel} />
       </div>
       
       {/* Channels List */}
@@ -55,7 +42,12 @@ const ChatSidebar = ({ channels, selectedChannel, onChannelSelect }: ChatSidebar
         {channels.map((channel) => (
           <ChannelItem
             key={channel.id}
-            channel={channel}
+            channel={{
+              id: channel.id,
+              name: channel.name,
+              description: channel.description || '',
+              members: 0 // This could be calculated from online users
+            }}
             isSelected={selectedChannel === channel.id}
             onClick={() => onChannelSelect(channel.id)}
           />
@@ -69,7 +61,7 @@ const ChatSidebar = ({ channels, selectedChannel, onChannelSelect }: ChatSidebar
         </div>
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-          <span className="text-sm text-slate-300">156 members active</span>
+          <span className="text-sm text-slate-300">Active community</span>
         </div>
       </div>
     </div>
