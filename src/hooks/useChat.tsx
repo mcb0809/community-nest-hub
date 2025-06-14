@@ -126,10 +126,22 @@ export const useChat = () => {
       )
       .subscribe();
 
-    // Channel metadata changes
+    // Channel metadata changes - listen for real-time updates
     const channelsRealtime = supabase
       .channel('channels-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'channels' }, (payload) => {
+        console.log('Channel updated:', payload);
+        const updatedChannel = payload.new;
+        setChannels(prev => prev.map(channel => 
+          channel.id === updatedChannel.id 
+            ? { ...channel, ...updatedChannel }
+            : channel
+        ));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'channels' }, () => {
+        loadChannels();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'channels' }, () => {
         loadChannels();
       })
       .subscribe();
@@ -433,15 +445,23 @@ export const useChat = () => {
           name,
           description,
           icon,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', channelId);
 
       if (error) throw error;
+      
+      // Update local state immediately for better UX
+      setChannels(prev => prev.map(channel => 
+        channel.id === channelId 
+          ? { ...channel, name, description, icon, updated_at: new Date().toISOString() }
+          : channel
+      ));
+      
       toast({
         title: "Success",
         description: "Channel updated successfully",
       });
-      await loadChannels();
     } catch (error) {
       console.error('Error editing channel:', error);
       toast({
