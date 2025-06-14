@@ -4,6 +4,7 @@ import { Bell, Search, Menu, Sun, Moon, Shield, AlertTriangle } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import ProfileDropdown from '@/components/admin/ProfileDropdown';
 
 const AdminHeader = ({ 
   toggleSidebar, 
@@ -72,9 +73,7 @@ const AdminHeader = ({
           </span>
         </Button>
         
-        <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-orange-600 rounded-full flex items-center justify-center">
-          <span className="text-white text-sm font-semibold">A</span>
-        </div>
+        <ProfileDropdown />
       </div>
     </header>
   );
