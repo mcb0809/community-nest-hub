@@ -185,6 +185,107 @@ export type Database = {
         }
         Relationships: []
       }
+      event_registrations: {
+        Row: {
+          event_id: string | null
+          id: string
+          registered_at: string
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          event_id?: string | null
+          id?: string
+          registered_at?: string
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          event_id?: string | null
+          id?: string
+          registered_at?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date: string
+          description: string | null
+          duration: number
+          format: string
+          id: string
+          instructor: string | null
+          location: string | null
+          max_attendees: number
+          meeting_link: string | null
+          recording: string | null
+          registered: number
+          registered_users: Json | null
+          status: string
+          tags: Json | null
+          time: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date: string
+          description?: string | null
+          duration?: number
+          format?: string
+          id?: string
+          instructor?: string | null
+          location?: string | null
+          max_attendees?: number
+          meeting_link?: string | null
+          recording?: string | null
+          registered?: number
+          registered_users?: Json | null
+          status?: string
+          tags?: Json | null
+          time: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string | null
+          duration?: number
+          format?: string
+          id?: string
+          instructor?: string | null
+          location?: string | null
+          max_attendees?: number
+          meeting_link?: string | null
+          recording?: string | null
+          registered?: number
+          registered_users?: Json | null
+          status?: string
+          tags?: Json | null
+          time?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lessons: {
         Row: {
           attachment_url: string | null

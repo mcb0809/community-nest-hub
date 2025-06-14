@@ -4,83 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, MapPin, Users, Video, Plus, Filter } from 'lucide-react';
+import { useEvents } from '@/hooks/useEvents';
+import { useAuth } from '@/hooks/useAuth';
 
 const EventHub = () => {
   const [view, setView] = useState<'upcoming' | 'past'>('upcoming');
+  const { events, loading, registerForEvent } = useEvents();
+  const { userProfile } = useAuth();
 
-  const upcomingEvents = [
-    {
-      id: 1,
-      title: 'React Performance Optimization Workshop',
-      description: 'Learn advanced techniques to optimize your React applications for better performance.',
-      type: 'workshop',
-      format: 'online',
-      date: '2024-06-20',
-      time: '14:00',
-      duration: 120,
-      instructor: 'John Smith',
-      maxAttendees: 50,
-      registered: 32,
-      registeredUsers: ['You', 'Sarah J.', 'Mike D.', '+29 others'],
-      tags: ['React', 'Performance', 'Advanced'],
-      meetingLink: 'https://zoom.us/j/123456789',
-      status: 'upcoming'
-    },
-    {
-      id: 2,
-      title: 'Monthly Community Meetup',
-      description: 'Join our monthly meetup to network with fellow developers and share knowledge.',
-      type: 'meetup',
-      format: 'offline',
-      date: '2024-06-25',
-      time: '18:30',
-      duration: 180,
-      location: 'Tech Hub, District 1, Ho Chi Minh City',
-      maxAttendees: 80,
-      registered: 65,
-      registeredUsers: ['You', 'Emily C.', 'Alex R.', '+62 others'],
-      tags: ['Networking', 'Community', 'Social'],
-      status: 'upcoming'
-    },
-    {
-      id: 3,
-      title: 'Database Design Masterclass',
-      description: 'Deep dive into database design principles and best practices.',
-      type: 'masterclass',
-      format: 'online',
-      date: '2024-06-28',
-      time: '20:00',
-      duration: 90,
-      instructor: 'Dr. Maria Garcia',
-      maxAttendees: 100,
-      registered: 78,
-      registeredUsers: ['David L.', 'Anna K.', 'Tom W.', '+75 others'],
-      tags: ['Database', 'SQL', 'Design'],
-      meetingLink: 'https://meet.google.com/abc-defg-hij',
-      status: 'upcoming'
-    },
-  ];
+  // Filter events based on status and view
+  const upcomingEvents = events.filter(event => 
+    event.status === 'upcoming' && new Date(event.date) >= new Date()
+  );
+  
+  const pastEvents = events.filter(event => 
+    event.status === 'completed' || new Date(event.date) < new Date()
+  );
 
-  const pastEvents = [
-    {
-      id: 4,
-      title: 'Introduction to Next.js 14',
-      description: 'Explore the new features and improvements in Next.js 14.',
-      type: 'webinar',
-      format: 'online',
-      date: '2024-06-10',
-      time: '19:00',
-      duration: 60,
-      instructor: 'Jane Doe',
-      maxAttendees: 200,
-      registered: 156,
-      tags: ['Next.js', 'React', 'Framework'],
-      status: 'completed',
-      recording: 'https://youtube.com/watch?v=example'
-    },
-  ];
-
-  const events = view === 'upcoming' ? upcomingEvents : pastEvents;
+  const displayEvents = view === 'upcoming' ? upcomingEvents : pastEvents;
 
   const getEventTypeColor = (type: string) => {
     const colors = {
@@ -101,6 +42,34 @@ const EventHub = () => {
     });
   };
 
+  const handleRegister = async (eventId: string) => {
+    if (!userProfile) {
+      alert('Please login to register for events');
+      return;
+    }
+
+    try {
+      await registerForEvent(eventId, userProfile.display_name);
+    } catch (error) {
+      console.error('Registration failed:', error);
+    }
+  };
+
+  const isUserRegistered = (event: any) => {
+    return event.registered_users?.includes(userProfile?.display_name);
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Loading events...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -109,10 +78,12 @@ const EventHub = () => {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Event Hub</h1>
           <p className="text-slate-600 dark:text-slate-400">Join our community events and workshops</p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Event
-        </Button>
+        {userProfile?.role === 'admin' && (
+          <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Event
+          </Button>
+        )}
       </div>
 
       {/* View Toggle */}
@@ -141,7 +112,7 @@ const EventHub = () => {
 
       {/* Events Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {events.map((event) => (
+        {displayEvents.map((event) => (
           <Card key={event.id} className="bg-white dark:bg-slate-800 hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4">
               <div className="flex justify-between items-start mb-2">
@@ -192,10 +163,10 @@ const EventHub = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
                   <Users className="w-4 h-4 mr-2" />
-                  {event.registered}/{event.maxAttendees} registered
+                  {event.registered}/{event.max_attendees} registered
                 </div>
                 <div className="text-xs text-slate-500">
-                  {Math.round((event.registered / event.maxAttendees) * 100)}% full
+                  {Math.round((event.registered / event.max_attendees) * 100)}% full
                 </div>
               </div>
 
@@ -203,31 +174,42 @@ const EventHub = () => {
               <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                 <div 
                   className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all"
-                  style={{ width: `${(event.registered / event.maxAttendees) * 100}%` }}
+                  style={{ width: `${(event.registered / event.max_attendees) * 100}%` }}
                 ></div>
               </div>
 
               {/* Registered Users */}
-              {event.registeredUsers && (
+              {event.registered_users && event.registered_users.length > 0 && (
                 <div className="text-xs text-slate-500">
-                  <span className="font-medium">Registered:</span> {event.registeredUsers.join(', ')}
+                  <span className="font-medium">Registered:</span> {event.registered_users.slice(0, 3).join(', ')}
+                  {event.registered_users.length > 3 && ` +${event.registered_users.length - 3} others`}
                 </div>
               )}
 
               {/* Tags */}
-              <div className="flex flex-wrap gap-1">
-                {event.tags.map((tag, index) => (
-                  <Badge key={index} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
+              {event.tags && event.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {event.tags.map((tag, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
 
               {/* Action Button */}
               <div className="pt-2">
                 {event.status === 'upcoming' ? (
-                  <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
-                    Register Now
+                  <Button 
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                    onClick={() => handleRegister(event.id)}
+                    disabled={isUserRegistered(event) || event.registered >= event.max_attendees}
+                  >
+                    {isUserRegistered(event) 
+                      ? 'Already Registered' 
+                      : event.registered >= event.max_attendees 
+                        ? 'Event Full' 
+                        : 'Register Now'}
                   </Button>
                 ) : (
                   <div className="flex gap-2">
@@ -247,7 +229,7 @@ const EventHub = () => {
         ))}
       </div>
 
-      {events.length === 0 && (
+      {displayEvents.length === 0 && (
         <div className="text-center py-12">
           <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
