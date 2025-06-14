@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,6 +35,7 @@ export interface Message {
 }
 
 export const useChat = () => {
+  // Add a ref to prevent state update after channel changes
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<string>('');
@@ -51,33 +51,77 @@ export const useChat = () => {
   // Load messages when channel changes
   useEffect(() => {
     if (selectedChannel) {
+      setMessages([]); // Reset messages immediately for smooth UI
       loadMessages(selectedChannel);
     }
   }, [selectedChannel]);
 
-  // Set up realtime subscriptions
+  // Setup realtime subscriptions per channel
   useEffect(() => {
-    const channelsSubscription = supabase
+    if (!selectedChannel) return;
+
+    // Clear messages when channel changes (already set above)
+    // Subscribe realtime for only selected channel
+    const realtimeChannel = supabase.channel(`messages:${selectedChannel}`);
+
+    // Listen only for events in current channel
+    realtimeChannel
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${selectedChannel}` },
+        (payload) => {
+          const newMsgData = payload.new;
+          setMessages((prev) => {
+            // Avoid duplicate if somehow message already in list (due to both initial fetch & real-time)
+            if (prev.some(m => m.id === newMsgData.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: newMsgData.id,
+                channel_id: newMsgData.channel_id || '',
+                user_id: newMsgData.user_id || '',
+                content: newMsgData.content,
+                reactions: typeof newMsgData.reactions === 'object' && newMsgData.reactions !== null ? newMsgData.reactions : {},
+                reply_to: newMsgData.reply_to,
+                created_at: newMsgData.created_at || '',
+                updated_at: newMsgData.updated_at || '',
+                user_profiles: null, // Will hydrate after
+                reply_message: null // Will hydrate after
+              }
+            ];
+          });
+          // Hydrate profiles async (for demo purposes, can optimize)
+          loadMessages(selectedChannel);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `channel_id=eq.${selectedChannel}` },
+        () => {
+          // For now just reload messages (can optimize partial update if needed)
+          loadMessages(selectedChannel);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages', filter: `channel_id=eq.${selectedChannel}` },
+        () => {
+          loadMessages(selectedChannel);
+        }
+      )
+      .subscribe();
+
+    // Listen for channel meta data changes (edit channel)
+    const channelsRealtime = supabase
       .channel('channels-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
         loadChannels();
       })
       .subscribe();
 
-    const messagesSubscription = supabase
-      .channel('messages-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          loadMessages(selectedChannel);
-        } else if (payload.eventType === 'UPDATE') {
-          loadMessages(selectedChannel);
-        }
-      })
-      .subscribe();
-
     return () => {
-      supabase.removeChannel(channelsSubscription);
-      supabase.removeChannel(messagesSubscription);
+      supabase.removeChannel(realtimeChannel);
+      supabase.removeChannel(channelsRealtime);
     };
   }, [selectedChannel]);
 
