@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +19,7 @@ import CourseAdmin from "./pages/admin/CourseAdmin";
 import CourseDetail from "./pages/admin/CourseDetail";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminLandingPage from "./pages/admin/AdminLandingPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
@@ -40,6 +42,7 @@ const App = () => (
                 <AdminLayout>
                   <Routes>
                     <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="landing" element={<AdminLandingPage />} />
                     <Route path="users" element={<AdminUsers />} />
                     <Route path="course" element={<CourseAdmin />} />
                     <Route path="course/:courseId" element={<CourseDetail />} />

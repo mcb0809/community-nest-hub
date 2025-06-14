@@ -12,7 +12,8 @@ import {
   Database,
   Shield,
   BarChart3,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,12 @@ const navigation = [
     href: '/admin/dashboard', 
     icon: LayoutDashboard, 
     description: 'Tổng quan hệ thống' 
+  },
+  { 
+    name: 'Landing Page', 
+    href: '/admin/landing', 
+    icon: Globe, 
+    description: 'Quản lý trang chủ' 
   },
   { 
     name: 'Quản lý Users', 
