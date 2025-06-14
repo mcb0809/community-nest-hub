@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Web3DashboardLayout from "./components/layout/Web3DashboardLayout";
 import Web3Dashboard from "./pages/Web3Dashboard";
 import CourseHub from "./pages/CourseHub";
+import CourseViewer from "./pages/CourseViewer";
 import CommunityChat from "./pages/CommunityChat";
 import EventHub from "./pages/EventHub";
 import DocumentationCenter from "./pages/DocumentationCenter";
@@ -27,6 +28,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Web3Dashboard />} />
             <Route path="/courses" element={<CourseHub />} />
+            <Route path="/courses/:courseId" element={<CourseViewer />} />
             <Route path="/chat" element={<CommunityChat />} />
             <Route path="/events" element={<EventHub />} />
             <Route path="/documents" element={<DocumentationCenter />} />

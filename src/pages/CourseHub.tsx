@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +34,7 @@ interface Course {
 }
 
 const CourseHub = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [courses, setCourses] = useState<Course[]>([]);
@@ -126,6 +129,10 @@ const CourseHub = () => {
       case 3: return 'Nâng cao';
       default: return 'Cơ bản';
     }
+  };
+
+  const handleStartCourse = (courseId: string) => {
+    navigate(`/courses/${courseId}`);
   };
 
   if (loading) {
@@ -242,7 +249,11 @@ const CourseHub = () => {
                   <span className="text-lg font-semibold text-cyan-400">
                     {course.price === 0 ? 'Miễn phí' : `${course.price.toLocaleString()}đ`}
                   </span>
-                  <Button size="sm" className="bg-gradient-to-r from-blue-500 to-purple-600">
+                  <Button 
+                    size="sm" 
+                    className="bg-gradient-to-r from-blue-500 to-purple-600"
+                    onClick={() => handleStartCourse(course.id)}
+                  >
                     Bắt đầu học
                   </Button>
                 </div>
