@@ -10,34 +10,25 @@ import {
   Users,
   TrendingUp
 } from 'lucide-react';
+import { useLandingPage } from '@/contexts/LandingPageContext';
 
 const AboutSection = () => {
-  const features = [
-    {
-      icon: Rocket,
-      title: 'Cập nhật kiến thức AI & Automation liên tục',
-      description: 'Luôn đi đầu xu hướng công nghệ mới nhất',
-      color: 'from-purple-500 to-purple-600'
-    },
-    {
-      icon: GraduationCap,
-      title: 'Khóa học miễn phí & chuyên sâu',
-      description: 'Từ cơ bản đến nâng cao, phù hợp mọi trình độ',
-      color: 'from-cyan-500 to-cyan-600'
-    },
-    {
-      icon: MessageCircle,
-      title: 'Cộng đồng thảo luận chất lượng cao',
-      description: 'Kết nối với những người cùng đam mê',
-      color: 'from-pink-500 to-pink-600'
-    },
-    {
-      icon: Brain,
-      title: 'Tích hợp AI Assistant cá nhân',
-      description: 'Hỗ trợ học tập và giải đáp 24/7',
-      color: 'from-orange-500 to-orange-600'
-    }
-  ];
+  const { data } = useLandingPage();
+  const { about } = data;
+
+  const iconMap = {
+    0: Rocket,
+    1: GraduationCap,
+    2: MessageCircle,
+    3: Brain
+  };
+
+  const colorMap = {
+    0: 'from-purple-500 to-purple-600',
+    1: 'from-cyan-500 to-cyan-600',
+    2: 'from-pink-500 to-pink-600',
+    3: 'from-orange-500 to-orange-600'
+  };
 
   return (
     <section className="py-20 px-4">
@@ -50,12 +41,11 @@ const AboutSection = () => {
           </Badge>
           
           <h2 className="text-4xl lg:text-5xl font-bold font-space gradient-web3-text mb-6">
-            Cộng đồng tiên phong về AI
+            {about.title}
           </h2>
           
           <p className="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed">
-            AI Automation Club là nơi kết nối những người đam mê tự động hóa và AI, 
-            nơi bạn có thể học – chia sẻ – kiếm tiền cùng cộng đồng.
+            {about.description}
           </p>
         </div>
 
@@ -80,25 +70,33 @@ const AboutSection = () => {
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {features.map((feature, index) => (
-            <Card key={index} className="glass-card border-purple-500/20 hover:neon-purple transition-all duration-300 hover:scale-105">
-              <CardContent className="p-6">
-                <div className="flex items-start space-x-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${feature.color} flex items-center justify-center flex-shrink-0`}>
-                    <feature.icon className="w-6 h-6 text-white" />
+          {about.features.map((feature, index) => {
+            const IconComponent = iconMap[index as keyof typeof iconMap];
+            const colorClass = colorMap[index as keyof typeof colorMap];
+            
+            return (
+              <Card key={index} className="glass-card border-purple-500/20 hover:neon-purple transition-all duration-300 hover:scale-105">
+                <CardContent className="p-6">
+                  <div className="flex items-start space-x-4">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${colorClass} flex items-center justify-center flex-shrink-0`}>
+                      <IconComponent className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-2 font-space">
+                        {feature}
+                      </h3>
+                      <p className="text-slate-400">
+                        {index === 0 && "Luôn đi đầu xu hướng công nghệ mới nhất"}
+                        {index === 1 && "Từ cơ bản đến nâng cao, phù hợp mọi trình độ"}
+                        {index === 2 && "Kết nối với những người cùng đam mê"}
+                        {index === 3 && "Hỗ trợ học tập và giải đáp 24/7"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-2 font-space">
-                      {feature.title}
-                    </h3>
-                    <p className="text-slate-400">
-                      {feature.description}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -4,31 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Brain, MessageCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { useLandingPage } from '@/contexts/LandingPageContext';
 
 const AIHelperBox = ({ onTryAI }: { onTryAI: () => void }) => {
   const [currentDemo, setCurrentDemo] = useState(0);
+  const { data } = useLandingPage();
+  const { aiHelper } = data;
   
-  const demoMessages = [
-    {
-      question: "Làm thế nào để tạo chatbot AI cho business?",
-      answer: "Tôi có thể hướng dẫn bạn từng bước: 1) Xác định mục đích chatbot, 2) Chọn platform phù hợp, 3) Thiết kế conversation flow..."
-    },
-    {
-      question: "Tool nào tốt nhất để automation email marketing?",
-      answer: "Dựa vào nhu cầu của bạn, tôi recommend: Zapier + Mailchimp cho beginners, hoặc Make.com + ActiveCampaign cho advanced users..."
-    },
-    {
-      question: "Cách optimize prompt để có kết quả AI tốt hơn?",
-      answer: "Secrets của prompt engineering: 1) Specific instructions, 2) Context examples, 3) Output format specification..."
-    }
-  ];
-
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentDemo((prev) => (prev + 1) % demoMessages.length);
+      setCurrentDemo((prev) => (prev + 1) % aiHelper.demoMessages.length);
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [aiHelper.demoMessages.length]);
 
   return (
     <section className="py-20 px-4">
@@ -38,16 +26,16 @@ const AIHelperBox = ({ onTryAI }: { onTryAI: () => void }) => {
             <div className="flex items-center justify-center mb-4">
               <Badge className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white px-4 py-2">
                 <Brain className="w-4 h-4 mr-2" />
-                AI Assistant Beta
+                {aiHelper.subtitle}
               </Badge>
             </div>
             
             <CardTitle className="text-3xl font-bold font-space gradient-web3-text mb-2">
-              Trợ lý AI đang hoạt động
+              {aiHelper.title}
             </CardTitle>
             
             <p className="text-slate-400">
-              Được hỗ trợ bởi GPT-4 và được training chuyên sâu về AI & Automation
+              {aiHelper.description}
             </p>
           </CardHeader>
           
@@ -59,7 +47,7 @@ const AIHelperBox = ({ onTryAI }: { onTryAI: () => void }) => {
                 <div className="flex justify-end">
                   <div className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white p-3 rounded-2xl rounded-tr-sm max-w-xs">
                     <p className="text-sm">
-                      {demoMessages[currentDemo].question}
+                      {aiHelper.demoMessages[currentDemo].question}
                     </p>
                   </div>
                 </div>
@@ -77,7 +65,7 @@ const AIHelperBox = ({ onTryAI }: { onTryAI: () => void }) => {
                       </div>
                     </div>
                     <p className="text-sm text-slate-300">
-                      {demoMessages[currentDemo].answer}
+                      {aiHelper.demoMessages[currentDemo].answer}
                     </p>
                   </div>
                 </div>
@@ -120,7 +108,7 @@ const AIHelperBox = ({ onTryAI }: { onTryAI: () => void }) => {
                 className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white px-6 py-3"
               >
                 <Brain className="w-4 h-4 mr-2" />
-                Thử ngay AI Assistant
+                {aiHelper.buttonText}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>

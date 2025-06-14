@@ -3,11 +3,15 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Zap, ArrowRight, Sparkles } from 'lucide-react';
+import { useLandingPage } from '@/contexts/LandingPageContext';
 
 const HeroSection = ({ onJoinClick, onExploreClick }: { 
   onJoinClick: () => void;
   onExploreClick: () => void;
 }) => {
+  const { data } = useLandingPage();
+  const { hero, stats } = data;
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background Effects */}
@@ -34,23 +38,32 @@ const HeroSection = ({ onJoinClick, onExploreClick }: {
 
         {/* Main Title */}
         <h1 className="text-5xl lg:text-7xl font-bold font-space mb-6">
-          <span className="gradient-web3-text">AI AUTOMATION</span>
+          <span className="gradient-web3-text">{hero.title.split(' ').slice(0, 2).join(' ')}</span>
           <br />
-          <span className="gradient-web3-text">CLUB Plus</span>
+          <span className="gradient-web3-text">{hero.title.split(' ').slice(2).join(' ')}</span>
         </h1>
 
         {/* Subtitle */}
         <div className="mb-4">
           <span className="text-2xl lg:text-3xl text-slate-300 font-medium">
-            MCB AI
+            {hero.subtitle}
           </span>
         </div>
 
         {/* Description */}
         <p className="text-xl lg:text-2xl text-slate-400 mb-12 max-w-4xl mx-auto leading-relaxed">
-          Cộng đồng tiên phong về <span className="text-purple-400 font-semibold">AI, Automation & Workflow MMO</span>
-          <br />
-          Nơi bạn có thể học – chia sẻ – kiếm tiền cùng cộng đồng
+          {hero.description.split('\n').map((line, index) => (
+            <React.Fragment key={index}>
+              {index === 0 ? (
+                <>
+                  Cộng đồng tiên phong về <span className="text-purple-400 font-semibold">AI, Automation & Workflow MMO</span>
+                </>
+              ) : (
+                line
+              )}
+              {index < hero.description.split('\n').length - 1 && <br />}
+            </React.Fragment>
+          ))}
         </p>
 
         {/* CTA Buttons */}
@@ -61,7 +74,7 @@ const HeroSection = ({ onJoinClick, onExploreClick }: {
             className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white px-8 py-4 text-lg font-semibold neon-purple transition-all duration-300 hover:scale-105"
           >
             <Zap className="w-5 h-5 mr-2" />
-            Tham gia cộng đồng
+            {hero.primaryButton}
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
           
@@ -71,18 +84,13 @@ const HeroSection = ({ onJoinClick, onExploreClick }: {
             onClick={onExploreClick}
             className="border-purple-500/50 text-purple-300 hover:bg-purple-500/10 px-8 py-4 text-lg font-semibold transition-all duration-300 hover:scale-105"
           >
-            Khám phá nội dung miễn phí
+            {hero.secondaryButton}
           </Button>
         </div>
 
         {/* Stats */}
         <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-2xl mx-auto">
-          {[
-            { number: '500+', label: 'Thành viên' },
-            { number: '50+', label: 'Khóa học' },
-            { number: '1000+', label: 'Bài viết' },
-            { number: '24/7', label: 'AI Support' },
-          ].map((stat, index) => (
+          {stats.map((stat, index) => (
             <div key={index} className="text-center">
               <div className="text-2xl lg:text-3xl font-bold gradient-web3-text mb-1">
                 {stat.number}
