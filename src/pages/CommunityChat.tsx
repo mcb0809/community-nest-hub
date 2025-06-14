@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   Hash,
@@ -38,6 +38,7 @@ const CommunityChat = () => {
   } = useChat();
 
   const { searchQuery, setSearchQuery, filteredMessages, hasActiveSearch } = useMessageSearch(messages);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [replyTo, setReplyTo] = useState<{
     messageId: string;
@@ -47,6 +48,11 @@ const CommunityChat = () => {
 
   // Modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Auto scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Redirect to auth if not logged in
   if (!authLoading && !user) {
@@ -213,7 +219,7 @@ const CommunityChat = () => {
                 key={message.id}
                 message={{
                   id: message.id,
-                  user: message.user_profiles?.display_name || 'Unknown User',
+                  user: message.user_profiles?.display_name || message.user_profiles?.email || user?.email || 'Unknown User',
                   avatar: message.user_profiles?.avatar_url || '/api/placeholder/32/32',
                   message: message.content,
                   timestamp: new Date(message.created_at).toLocaleTimeString([],
@@ -237,6 +243,8 @@ const CommunityChat = () => {
                 onReact={handleReact}
               />
             ))}
+            {/* Invisible div to scroll to */}
+            <div ref={messagesEndRef} />
           </div>
         </div>
 

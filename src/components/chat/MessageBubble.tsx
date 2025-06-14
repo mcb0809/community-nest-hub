@@ -73,7 +73,7 @@ const MessageBubble = ({ message, onReply, onReact }: MessageBubbleProps) => {
         <Avatar className="w-10 h-10 flex-shrink-0 ring-2 ring-purple-500/30">
           <AvatarImage src={message.avatar} />
           <AvatarFallback className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold">
-            {message.user[0]}
+            {message.user[0]?.toUpperCase()}
           </AvatarFallback>
         </Avatar>
         

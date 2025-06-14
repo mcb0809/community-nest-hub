@@ -26,6 +26,7 @@ export interface Message {
     display_name: string;
     avatar_url: string | null;
     role: string;
+    email?: string;
   } | null;
   reply_message?: {
     content: string;
@@ -43,7 +44,7 @@ export const useChat = () => {
   const [selectedChannel, setSelectedChannel] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { toast } = useToast();
 
   // Load channels
@@ -212,7 +213,7 @@ export const useChat = () => {
       // Fetch user profiles
       const { data: profilesData } = await supabase
         .from('user_profiles')
-        .select('id, display_name, avatar_url, role')
+        .select('id, display_name, avatar_url, role, email')
         .in('id', userIds);
 
       // Fetch reply messages
@@ -312,7 +313,7 @@ export const useChat = () => {
       // Fetch user profiles
       const { data: profilesData } = await supabase
         .from('user_profiles')
-        .select('id, display_name, avatar_url, role')
+        .select('id, display_name, avatar_url, role, email')
         .in('id', userIds);
 
       // Fetch reply messages
@@ -384,9 +385,10 @@ export const useChat = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       user_profiles: {
-        display_name: user.email || 'Unknown User',
-        avatar_url: null,
-        role: 'user'
+        display_name: userProfile?.display_name || user.email?.split('@')[0] || 'Unknown User',
+        avatar_url: userProfile?.avatar_url || null,
+        role: userProfile?.role || 'user',
+        email: user.email || undefined
       },
       reply_message: null,
       attachments: attachments || [],
