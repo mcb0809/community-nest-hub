@@ -6,6 +6,7 @@ import ChannelItem from './ChannelItem';
 import CreateChannelModal from './CreateChannelModal';
 import { Channel, Message } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 interface ChatSidebarProps {
   channels: Channel[];
@@ -18,6 +19,15 @@ interface ChatSidebarProps {
 
 const ChatSidebar = ({ channels, selectedChannel, messages, unreadCounts, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {
   const { isAdmin } = useAuth();
+  const { isAuthenticated, requireAuth } = useAuthGuard();
+
+  const handleChannelClick = (channelId: string) => {
+    if (!isAuthenticated) {
+      requireAuth();
+      return;
+    }
+    onChannelSelect(channelId);
+  };
 
   return (
     <div className="w-80 glass-card border-r border-purple-500/20 flex flex-col">
@@ -57,7 +67,7 @@ const ChatSidebar = ({ channels, selectedChannel, messages, unreadCounts, onChan
               unreadCount: unreadCounts[channel.id] || 0
             }}
             isSelected={selectedChannel === channel.id}
-            onClick={() => onChannelSelect(channel.id)}
+            onClick={() => handleChannelClick(channel.id)}
           />
         ))}
       </div>
