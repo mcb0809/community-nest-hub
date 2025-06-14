@@ -31,8 +31,12 @@ const AuthRequiredModal = ({
     onClose();
   };
 
+  const handleClose = () => {
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="bg-slate-900 border-purple-500/20 text-white max-w-md">
         <DialogHeader className="text-center">
           <div className="mx-auto w-16 h-16 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mb-4">
@@ -54,7 +58,7 @@ const AuthRequiredModal = ({
           </Button>
           <Button 
             variant="ghost" 
-            onClick={onClose}
+            onClick={handleClose}
             className="w-full text-slate-400 hover:text-white hover:bg-slate-800"
           >
             Hủy

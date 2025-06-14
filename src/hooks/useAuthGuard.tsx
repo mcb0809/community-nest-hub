@@ -23,7 +23,7 @@ export const useAuthGuard = () => {
   };
 
   return {
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !loading,
     showAuthModal,
     requireAuth,
     closeAuthModal,
