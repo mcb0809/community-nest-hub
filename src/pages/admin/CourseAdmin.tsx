@@ -38,8 +38,7 @@ const CourseAdmin = () => {
 
   const fetchCourses = async () => {
     try {
-      // Use any to bypass TypeScript errors until types are regenerated
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('courses')
         .select(`
           *,
@@ -69,7 +68,7 @@ const CourseAdmin = () => {
 
   const toggleCourseVisibility = async (courseId: string, isPublic: boolean) => {
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('courses')
         .update({ is_public: !isPublic })
         .eq('id', courseId);

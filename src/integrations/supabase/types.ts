@@ -72,6 +72,92 @@ export type Database = {
         }
         Relationships: []
       }
+      courses: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean | null
+          level: number
+          price: number | null
+          thumbnail_url: string | null
+          title: string
+          total_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          level?: number
+          price?: number | null
+          thumbnail_url?: string | null
+          title: string
+          total_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          level?: number
+          price?: number | null
+          thumbnail_url?: string | null
+          title?: string
+          total_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lessons: {
+        Row: {
+          content: string | null
+          course_id: string | null
+          created_at: string
+          id: string
+          is_free_preview: boolean | null
+          order_index: number | null
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          content?: string | null
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          is_free_preview?: boolean | null
+          order_index?: number | null
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          content?: string | null
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          is_free_preview?: boolean | null
+          order_index?: number | null
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lessons_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_links: {
         Row: {
           created_at: string

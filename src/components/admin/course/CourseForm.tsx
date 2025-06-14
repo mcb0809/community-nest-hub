@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -120,8 +119,8 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
       };
 
       if (course) {
-        // Update existing course - use any to bypass TypeScript errors
-        const { error } = await (supabase as any)
+        // Update existing course
+        const { error } = await supabase
           .from('courses')
           .update(courseData)
           .eq('id', course.id);
@@ -133,8 +132,8 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
           description: "Khóa học đã được cập nhật",
         });
       } else {
-        // Create new course - use any to bypass TypeScript errors
-        const { error } = await (supabase as any)
+        // Create new course
+        const { error } = await supabase
           .from('courses')
           .insert([courseData]);
 
