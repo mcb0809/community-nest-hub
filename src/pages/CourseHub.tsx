@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,21 +44,42 @@ const CourseHub = () => {
 
   const fetchCourses = async () => {
     try {
-      const { data, error } = await supabase
+      // First fetch all public courses
+      const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select(`
-          *,
-          lessons(count)
-        `)
+        .select('*')
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (coursesError) throw coursesError;
 
-      const coursesWithLessonCount = data?.map((course: any) => ({
-        ...course,
-        lesson_count: course.lessons?.[0]?.count || 0
-      })) || [];
+      // Then fetch lesson counts for each course through modules
+      const coursesWithLessonCount = await Promise.all(
+        (coursesData || []).map(async (course) => {
+          const { data: modulesData, error: modulesError } = await supabase
+            .from('modules')
+            .select(`
+              id,
+              lessons(count)
+            `)
+            .eq('course_id', course.id);
+
+          if (modulesError) {
+            console.error('Error fetching modules for course:', course.id, modulesError);
+            return { ...course, lesson_count: 0 };
+          }
+
+          // Calculate total lesson count across all modules
+          const totalLessons = modulesData?.reduce((total, module: any) => {
+            return total + (module.lessons?.[0]?.count || 0);
+          }, 0) || 0;
+
+          return {
+            ...course,
+            lesson_count: totalLessons
+          };
+        })
+      );
 
       setCourses(coursesWithLessonCount);
     } catch (error) {
