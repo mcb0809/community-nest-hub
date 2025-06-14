@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -6,7 +7,8 @@ import {
   Settings,
   Search,
   Bell,
-  LogOut
+  LogOut,
+  icons
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +78,6 @@ const CommunityChat = () => {
     await signOut();
   };
 
-  // NEW: callback lưu
   const handleEditChannel = (data: { 
     id: string; 
     name: string; 
@@ -132,7 +133,6 @@ const CommunityChat = () => {
             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
               <Search className="w-4 h-4" />
             </Button>
-            {/* CHỈNH Ở ĐÂY: Nút settings gọi modal chỉnh sửa channel */}
             <Button
               variant="ghost"
               size="sm"
@@ -153,7 +153,7 @@ const CommunityChat = () => {
           </div>
         </div>
 
-        {/* Mở Edit Channel Modal nếu open */}
+        {/* Edit Channel Modal */}
         <EditChannelModal
           open={editModalOpen}
           onOpenChange={setEditModalOpen}
@@ -162,8 +162,8 @@ const CommunityChat = () => {
             name: currentChannel.name,
             description: currentChannel.description,
             icon: currentChannel.icon || "Hash",
-            role: "user", // chưa dùng
-            isPublic: true, // chưa dùng
+            role: "user",
+            isPublic: true,
           } : null}
           onSave={handleEditChannel}
         />
