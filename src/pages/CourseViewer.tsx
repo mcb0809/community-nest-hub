@@ -108,6 +108,18 @@ const CourseViewer = () => {
     }
   };
 
+  const extractYouTubeVideoId = (url: string) => {
+    if (!url) return null;
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+  };
+
+  const getYouTubeEmbedUrl = (url: string) => {
+    const videoId = extractYouTubeVideoId(url);
+    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  };
+
   const getLevelText = (level: number) => {
     switch (level) {
       case 1: return 'Cơ bản';
@@ -145,6 +157,8 @@ const CourseViewer = () => {
     );
   }
 
+  const embedUrl = currentLesson?.video_url ? getYouTubeEmbedUrl(currentLesson.video_url) : null;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-120px)]">
       {/* Main Video/Content Area */}
@@ -166,16 +180,21 @@ const CourseViewer = () => {
               <div>
                 {/* Video Area */}
                 <div className="w-full h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center rounded-t-lg">
-                  {currentLesson.video_url ? (
+                  {embedUrl ? (
                     <iframe
-                      src={currentLesson.video_url}
+                      src={embedUrl}
+                      title={currentLesson.title}
                       className="w-full h-full rounded-t-lg"
                       allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     />
                   ) : (
                     <div className="text-center">
                       <Play className="w-16 h-16 text-white/50 mx-auto mb-4" />
-                      <p className="text-white/70">Video chưa có sẵn</p>
+                      <p className="text-white/70">Video chưa có sẵn hoặc URL không hợp lệ</p>
+                      {currentLesson.video_url && (
+                        <p className="text-white/50 text-sm mt-2">URL: {currentLesson.video_url}</p>
+                      )}
                     </div>
                   )}
                 </div>
