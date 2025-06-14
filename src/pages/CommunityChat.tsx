@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { 
@@ -141,7 +140,7 @@ const CommunityChat = () => {
                     hour: '2-digit', 
                     minute: '2-digit' 
                   }),
-                  role: message.user_profiles?.role as 'admin' | 'vip' | 'member' || 'member',
+                  role: (message.user_profiles?.role as 'admin' | 'mod' | 'user') || 'user',
                   replyTo: message.reply_message ? {
                     user: message.reply_message.user_profiles?.display_name || 'Unknown User',
                     message: message.reply_message.content

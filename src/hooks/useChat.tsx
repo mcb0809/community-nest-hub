@@ -108,27 +108,79 @@ export const useChat = () => {
 
   const loadMessages = async (channelId: string) => {
     try {
-      const { data, error } = await supabase
+      // First, get messages with basic info
+      const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select(`
-          *,
-          user_profiles!inner (display_name, avatar_url, role),
-          reply_message:reply_to (
-            content,
-            user_profiles!inner (display_name)
-          )
-        `)
+        .select('*')
         .eq('channel_id', channelId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      
-      // Transform the data to match our Message interface
-      const transformedMessages: Message[] = (data || []).map(msg => ({
-        ...msg,
+      if (messagesError) throw messagesError;
+
+      if (!messagesData || messagesData.length === 0) {
+        setMessages([]);
+        return;
+      }
+
+      // Get user IDs and reply message IDs
+      const userIds = [...new Set(messagesData.map(msg => msg.user_id).filter(Boolean))];
+      const replyMessageIds = [...new Set(messagesData.map(msg => msg.reply_to).filter(Boolean))];
+
+      // Fetch user profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('id, display_name, avatar_url, role')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError);
+      }
+
+      // Fetch reply messages if any
+      let replyMessagesData: any[] = [];
+      if (replyMessageIds.length > 0) {
+        const { data: replyData, error: replyError } = await supabase
+          .from('messages')
+          .select('id, content, user_id')
+          .in('id', replyMessageIds);
+
+        if (replyError) {
+          console.error('Error loading reply messages:', replyError);
+        } else {
+          replyMessagesData = replyData || [];
+        }
+      }
+
+      // Create profiles map for quick lookup
+      const profilesMap = new Map();
+      (profilesData || []).forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+
+      // Create reply messages map
+      const replyMessagesMap = new Map();
+      replyMessagesData.forEach(reply => {
+        const profile = profilesMap.get(reply.user_id);
+        replyMessagesMap.set(reply.id, {
+          content: reply.content,
+          user_profiles: profile ? { display_name: profile.display_name } : null
+        });
+      });
+
+      // Transform messages with proper typing
+      const transformedMessages: Message[] = messagesData.map(msg => ({
+        id: msg.id,
+        channel_id: msg.channel_id || '',
+        user_id: msg.user_id || '',
+        content: msg.content,
         reactions: typeof msg.reactions === 'object' && msg.reactions !== null 
           ? msg.reactions as Record<string, string[]>
-          : {}
+          : {},
+        reply_to: msg.reply_to,
+        created_at: msg.created_at || '',
+        updated_at: msg.updated_at || '',
+        user_profiles: profilesMap.get(msg.user_id) || null,
+        reply_message: msg.reply_to ? replyMessagesMap.get(msg.reply_to) : null
       }));
       
       setMessages(transformedMessages);

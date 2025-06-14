@@ -13,7 +13,7 @@ interface Message {
   avatar: string;
   message: string;
   timestamp: string;
-  role: 'admin' | 'vip' | 'member';
+  role: 'admin' | 'mod' | 'user';
   replyTo?: {
     user: string;
     message: string;
@@ -38,7 +38,7 @@ const getRoleConfig = (role: string) => {
         color: 'bg-red-500/20 text-red-300 border-red-500/40',
         glow: 'shadow-red-500/20'
       };
-    case 'vip': 
+    case 'mod': 
       return { 
         color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
         glow: 'shadow-yellow-500/20'
