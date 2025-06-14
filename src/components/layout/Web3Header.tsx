@@ -1,9 +1,11 @@
 
 import React from 'react';
-import { Bell, Search, Menu, Sun, Moon, Zap } from 'lucide-react';
+import { Bell, Search, Menu, Sun, Moon, Zap, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import Web3ProfileDropdown from './Web3ProfileDropdown';
 
 const Web3Header = ({ 
@@ -15,6 +17,13 @@ const Web3Header = ({
   darkMode: boolean;
   toggleDarkMode: () => void;
 }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLoginClick = () => {
+    navigate('/auth');
+  };
+
   return (
     <header className="h-16 glass-card border-b border-purple-500/20 flex items-center justify-between px-4 lg:px-6">
       {/* Left side */}
@@ -68,15 +77,27 @@ const Web3Header = ({
           </span>
         </Button>
         
-        <Web3ProfileDropdown />
-        
-        {/* Level indicator */}
-        <div className="hidden sm:flex flex-col items-end">
-          <span className="text-xs text-purple-300">Level 12</span>
-          <div className="w-16 h-1 bg-slate-700 rounded-full overflow-hidden">
-            <div className="w-3/4 h-full bg-gradient-to-r from-purple-500 to-cyan-500"></div>
-          </div>
-        </div>
+        {user ? (
+          <>
+            <Web3ProfileDropdown />
+            
+            {/* Level indicator */}
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-xs text-purple-300">Level 12</span>
+              <div className="w-16 h-1 bg-slate-700 rounded-full overflow-hidden">
+                <div className="w-3/4 h-full bg-gradient-to-r from-purple-500 to-cyan-500"></div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <Button 
+            onClick={handleLoginClick}
+            className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white"
+          >
+            <LogIn className="w-4 h-4 mr-2" />
+            Đăng nhập
+          </Button>
+        )}
       </div>
     </header>
   );
