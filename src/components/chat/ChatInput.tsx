@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import VoiceRecorder from './VoiceRecorder';
 import FileAttachment from './FileAttachment';
+import EmojiPicker from './EmojiPicker';
 import { useFileUpload } from '@/hooks/useFileUpload';
 
 interface ChatInputProps {
@@ -30,6 +31,7 @@ interface ChatInputProps {
 const ChatInput = ({ selectedChannel, onSendMessage, replyTo, onCancelReply }: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachments, setAttachments] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, uploading } = useFileUpload();
@@ -78,6 +80,10 @@ const ChatInput = ({ selectedChannel, onSendMessage, replyTo, onCancelReply }: C
 
   const handleVoiceMessage = (attachment: any) => {
     onSendMessage('', undefined, [attachment]);
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prev => prev + emoji);
   };
 
   if (showVoiceRecorder) {
@@ -187,13 +193,21 @@ const ChatInput = ({ selectedChannel, onSendMessage, replyTo, onCancelReply }: C
               >
                 <Paperclip className="w-4 h-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20"
-              >
-                <Smile className="w-4 h-4" />
-              </Button>
+              <div className="relative">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
+                  <Smile className="w-4 h-4" />
+                </Button>
+                <EmojiPicker
+                  isOpen={showEmojiPicker}
+                  onEmojiSelect={handleEmojiSelect}
+                  onClose={() => setShowEmojiPicker(false)}
+                />
+              </div>
             </div>
           </div>
           
