@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Edit, Eye, EyeOff, BookOpen } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Eye, EyeOff, BookOpen, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +22,7 @@ interface Course {
   total_hours: number;
   price: number;
   is_public: boolean;
-  lesson_count?: number;
+  module_count?: number;
 }
 
 const CourseAdmin = () => {
@@ -31,6 +33,7 @@ const CourseAdmin = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchCourses();
@@ -42,18 +45,18 @@ const CourseAdmin = () => {
         .from('courses')
         .select(`
           *,
-          lessons(count)
+          modules(count)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const coursesWithLessonCount = data?.map((course: any) => ({
+      const coursesWithModuleCount = data?.map((course: any) => ({
         ...course,
-        lesson_count: course.lessons?.[0]?.count || 0
+        module_count: course.modules?.[0]?.count || 0
       })) || [];
 
-      setCourses(coursesWithLessonCount);
+      setCourses(coursesWithModuleCount);
     } catch (error) {
       console.error('Error fetching courses:', error);
       toast({
@@ -218,11 +221,18 @@ const CourseAdmin = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-slate-800 border-slate-600">
                       <DropdownMenuItem
+                        onClick={() => navigate(`/admin/course/${course.id}`)}
+                        className="text-white hover:bg-slate-700"
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Quản lý nội dung
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
                         onClick={() => setEditingCourse(course)}
                         className="text-white hover:bg-slate-700"
                       >
                         <Edit className="w-4 h-4 mr-2" />
-                        Chỉnh sửa
+                        Chỉnh sửa thông tin
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => toggleCourseVisibility(course.id, course.is_public)}
@@ -268,8 +278,8 @@ const CourseAdmin = () => {
                 </div>
                 
                 <div className="flex justify-between">
-                  <span>Số bài học:</span>
-                  <span className="text-white">{course.lesson_count || 0}</span>
+                  <span>Số module:</span>
+                  <span className="text-white">{course.module_count || 0}</span>
                 </div>
                 
                 <div className="flex justify-between">

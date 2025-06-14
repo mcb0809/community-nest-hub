@@ -1,22 +1,23 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Switch } from '@/components/ui/switch';
+import { Upload, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, X } from 'lucide-react';
 
 const courseSchema = z.object({
   title: z.string().min(1, 'Tên khóa học là bắt buộc'),
   description: z.string().optional(),
   category: z.string().min(1, 'Danh mục là bắt buộc'),
-  level: z.number().min(1).max(3),
+  level: z.number().min(1).max(10),
   total_hours: z.number().min(0),
   price: z.number().min(0),
   is_public: z.boolean(),
@@ -25,37 +26,15 @@ const courseSchema = z.object({
 
 type CourseFormData = z.infer<typeof courseSchema>;
 
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail_url: string;
-  category: string;
-  level: number;
-  total_hours: number;
-  price: number;
-  is_public: boolean;
-}
-
 interface CourseFormProps {
-  course?: Course;
+  course?: any;
   onSuccess: () => void;
 }
 
-const categories = [
-  'Giáo Dục',
-  'AI',
-  'Automation',
-  'Kỹ năng mềm',
-  'Marketing',
-  'Công nghệ',
-  'Kinh doanh'
-];
-
-const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
-  const [loading, setLoading] = useState(false);
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState(course?.thumbnail_url || '');
+const CourseForm = ({ course, onSuccess }: CourseFormProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string>(course?.thumbnail_url || '');
   const { toast } = useToast();
 
   const form = useForm<CourseFormData>({
@@ -72,28 +51,18 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
     },
   });
 
-  const handleThumbnailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setThumbnailFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setThumbnailPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadThumbnail = async (file: File): Promise<string> => {
+  const uploadImage = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
+    const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `course-thumbnails/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('course-files')
       .upload(filePath, file);
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      throw uploadError;
+    }
 
     const { data } = supabase.storage
       .from('course-files')
@@ -102,19 +71,43 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
     return data.publicUrl;
   };
 
-  const onSubmit = async (data: CourseFormData) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
     try {
-      setLoading(true);
+      const imageUrl = await uploadImage(file);
+      setPreviewImage(imageUrl);
+      form.setValue('thumbnail_url', imageUrl);
+      toast({
+        title: "Thành công",
+        description: "Đã tải lên ảnh thumbnail",
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải lên ảnh",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
-      let thumbnailUrl = data.thumbnail_url;
-      
-      if (thumbnailFile) {
-        thumbnailUrl = await uploadThumbnail(thumbnailFile);
-      }
-
+  const onSubmit = async (data: CourseFormData) => {
+    setIsSubmitting(true);
+    try {
       const courseData = {
-        ...data,
-        thumbnail_url: thumbnailUrl,
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        level: data.level,
+        total_hours: data.total_hours,
+        price: data.price,
+        is_public: data.is_public,
+        thumbnail_url: data.thumbnail_url,
         updated_at: new Date().toISOString(),
       };
 
@@ -141,7 +134,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
 
         toast({
           title: "Thành công",
-          description: "Khóa học đã được tạo thành công",
+          description: "Khóa học đã được tạo",
         });
       }
 
@@ -150,78 +143,26 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
       console.error('Error saving course:', error);
       toast({
         title: "Lỗi",
-        description: "Không thể lưu khóa học. Vui lòng thử lại.",
+        description: "Không thể lưu khóa học",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Thumbnail Upload */}
-      <div className="space-y-4">
-        <label className="text-sm font-medium text-white">Ảnh bìa khóa học</label>
-        
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1">
-            <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleThumbnailChange}
-                className="hidden"
-                id="thumbnail-upload"
-              />
-              <label htmlFor="thumbnail-upload" className="cursor-pointer">
-                <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-400">
-                  Click để tải lên ảnh bìa hoặc kéo thả file vào đây
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  PNG, JPG, GIF up to 10MB
-                </p>
-              </label>
-            </div>
-          </div>
-          
-          {thumbnailPreview && (
-            <div className="lg:w-64">
-              <div className="relative">
-                <img
-                  src={thumbnailPreview}
-                  alt="Preview"
-                  className="w-full aspect-video object-cover rounded-lg"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="destructive"
-                  className="absolute top-2 right-2"
-                  onClick={() => {
-                    setThumbnailPreview('');
-                    setThumbnailFile(null);
-                  }}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Course Title */}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-4">
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
-                <FormItem className="lg:col-span-2">
-                  <FormLabel className="text-white">Tên khóa học *</FormLabel>
+                <FormItem>
+                  <FormLabel className="text-white">Tên khóa học</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Nhập tên khóa học..."
@@ -234,71 +175,17 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
               )}
             />
 
-            {/* Category */}
             <FormField
               control={form.control}
-              name="category"
+              name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">Danh mục *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="glass border-slate-600 text-white">
-                        <SelectValue placeholder="Chọn danh mục" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-slate-800 border-slate-600">
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category} className="text-white hover:bg-slate-700">
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Level */}
-            <FormField
-              control={form.control}
-              name="level"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Yêu cầu cấp độ</FormLabel>
-                  <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={field.value?.toString()}>
-                    <FormControl>
-                      <SelectTrigger className="glass border-slate-600 text-white">
-                        <SelectValue placeholder="Chọn cấp độ" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-slate-800 border-slate-600">
-                      <SelectItem value="1" className="text-white hover:bg-slate-700">Cấp độ 1</SelectItem>
-                      <SelectItem value="2" className="text-white hover:bg-slate-700">Cấp độ 2</SelectItem>
-                      <SelectItem value="3" className="text-white hover:bg-slate-700">Cấp độ 3</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Total Hours */}
-            <FormField
-              control={form.control}
-              name="total_hours"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Tổng số giờ học</FormLabel>
+                  <FormLabel className="text-white">Mô tả</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      step="0.5"
-                      placeholder="0"
+                    <Textarea
+                      placeholder="Mô tả khóa học..."
                       {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                      className="glass border-slate-600 text-white placeholder-slate-400"
+                      className="glass border-slate-600 text-white placeholder-slate-400 min-h-[120px]"
                     />
                   </FormControl>
                   <FormMessage />
@@ -306,82 +193,198 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onSuccess }) => {
               )}
             />
 
-            {/* Price */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Danh mục</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="glass border-slate-600 text-white">
+                          <SelectValue placeholder="Chọn danh mục" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-slate-800 border-slate-600">
+                        <SelectItem value="Web Development" className="text-white">Web Development</SelectItem>
+                        <SelectItem value="Mobile Development" className="text-white">Mobile Development</SelectItem>
+                        <SelectItem value="Data Science" className="text-white">Data Science</SelectItem>
+                        <SelectItem value="AI/ML" className="text-white">AI/ML</SelectItem>
+                        <SelectItem value="Blockchain" className="text-white">Blockchain</SelectItem>
+                        <SelectItem value="DevOps" className="text-white">DevOps</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="level"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Cấp độ</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="10"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                        className="glass border-slate-600 text-white"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="total_hours"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Tổng giờ học</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        className="glass border-slate-600 text-white"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Giá (VNĐ)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        className="glass border-slate-600 text-white"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
-              name="price"
+              name="is_public"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Giá tiền (VNĐ)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                      className="glass border-slate-600 text-white placeholder-slate-400"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Description */}
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white">Giới thiệu khóa học</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Mô tả chi tiết về khóa học..."
-                    className="min-h-[120px] glass border-slate-600 text-white placeholder-slate-400"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Public Toggle */}
-          <FormField
-            control={form.control}
-            name="is_public"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border border-slate-600 p-4 glass">
-                <div className="space-y-0.5">
-                  <FormLabel className="text-white font-medium">Hiển thị khóa học</FormLabel>
-                  <div className="text-sm text-slate-400">
-                    Cho phép mọi người xem và đăng ký khóa học này
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-slate-600 p-4 glass">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-white">Công khai khóa học</FormLabel>
+                    <div className="text-sm text-slate-400">
+                      Cho phép học viên xem và đăng ký khóa học này
+                    </div>
                   </div>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-4">
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600"
-            >
-              {loading ? 'Đang lưu...' : (course ? 'Cập nhật khóa học' : 'Tạo khóa học')}
-            </Button>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
           </div>
-        </form>
-      </Form>
-    </div>
+
+          {/* Right Column - Image Upload */}
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="thumbnail_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Ảnh thumbnail</FormLabel>
+                  <FormControl>
+                    <div className="space-y-4">
+                      {previewImage ? (
+                        <div className="relative aspect-video rounded-lg overflow-hidden border-2 border-dashed border-slate-600">
+                          <img
+                            src={previewImage}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              setPreviewImage('');
+                              field.onChange('');
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="aspect-video rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center glass">
+                          <div className="text-center">
+                            <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                            <p className="text-slate-400">Chọn ảnh thumbnail</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={uploadingImage}
+                          onClick={() => document.getElementById('thumbnail-upload')?.click()}
+                          className="border-slate-600 text-white hover:bg-slate-700"
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          {uploadingImage ? 'Đang tải...' : 'Chọn ảnh'}
+                        </Button>
+                        <input
+                          id="thumbnail-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                        />
+                      </div>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-4 pt-6 border-t border-slate-600">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600"
+          >
+            {isSubmitting ? 'Đang lưu...' : course ? 'Cập nhật' : 'Tạo khóa học'}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 };
 

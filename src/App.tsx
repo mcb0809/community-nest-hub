@@ -12,6 +12,7 @@ import EventHub from "./pages/EventHub";
 import DocumentationCenter from "./pages/DocumentationCenter";
 import Members from "./pages/Members";
 import CourseAdmin from "./pages/admin/CourseAdmin";
+import CourseDetail from "./pages/admin/CourseDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/documents" element={<DocumentationCenter />} />
             <Route path="/members" element={<Members />} />
             <Route path="/admin/course" element={<CourseAdmin />} />
+            <Route path="/admin/course/:courseId" element={<CourseDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Web3DashboardLayout>
