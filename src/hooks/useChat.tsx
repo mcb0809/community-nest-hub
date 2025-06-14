@@ -340,6 +340,40 @@ export const useChat = () => {
     }
   };
 
+  // Thêm function editChannel
+  const editChannel = async (
+    channelId: string,
+    name: string,
+    description: string,
+    icon: string
+  ) => {
+    try {
+      const { error } = await supabase
+        .from('channels')
+        .update({
+          name,
+          description,
+          // Có thể lưu icon vào cột mới nếu db có cột icon.
+        })
+        .eq('id', channelId);
+
+      if (error) throw error;
+      toast({
+        title: "Thành công",
+        description: "Cập nhật kênh thành công",
+      });
+      // Reload lại channels, giữ nguyên kênh đang chọn
+      await loadChannels();
+    } catch (error) {
+      console.error('Error editing channel:', error);
+      toast({
+        title: "Lỗi",
+        description: "Cập nhật kênh thất bại",
+        variant: "destructive",
+      });
+    }
+  };
+
   return {
     channels,
     messages,
@@ -349,5 +383,6 @@ export const useChat = () => {
     sendMessage,
     createChannel,
     updateChannelReaction,
+    editChannel, // nhớ thêm vào return object
   };
 };

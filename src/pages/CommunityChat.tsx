@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { 
-  Hash, 
+import {
+  Hash,
   Users,
   Settings,
   Search,
@@ -13,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
+import EditChannelModal from '@/components/chat/EditChannelModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useChat } from '@/hooks/useChat';
 
@@ -27,13 +29,17 @@ const CommunityChat = () => {
     sendMessage,
     createChannel,
     updateChannelReaction,
+    editChannel, // Thêm function nếu có
   } = useChat();
-  
+
   const [replyTo, setReplyTo] = useState<{
     messageId: string;
     user: string;
     message: string;
   } | undefined>();
+
+  // Modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   // Redirect to auth if not logged in
   if (!authLoading && !user) {
@@ -71,10 +77,17 @@ const CommunityChat = () => {
     await signOut();
   };
 
+  // NEW: callback lưu
+  const handleEditChannel = (data: { id: string; name: string; description: string; icon: string }) => {
+    if(!editChannel) return;
+    editChannel(data.id, data.name, data.description, data.icon);
+    // reload handled in hook
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gradient-to-br from-slate-900 via-purple-900/10 to-slate-900">
       {/* Sidebar */}
-      <ChatSidebar 
+      <ChatSidebar
         channels={channels}
         selectedChannel={selectedChannel}
         onChannelSelect={setSelectedChannel}
@@ -102,7 +115,7 @@ const CommunityChat = () => {
               {messages.length}
             </Badge>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <span className="text-sm text-slate-300">{user?.email}</span>
             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
@@ -111,12 +124,19 @@ const CommunityChat = () => {
             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
               <Search className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
+            {/* CHỈNH Ở ĐÂY: Nút settings gọi modal chỉnh sửa channel */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20"
+              onClick={() => setEditModalOpen(true)}
+              aria-label="Chỉnh sửa kênh"
+            >
               <Settings className="w-4 h-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleSignOut}
               className="text-slate-400 hover:text-red-400 hover:bg-red-500/20"
             >
@@ -124,6 +144,21 @@ const CommunityChat = () => {
             </Button>
           </div>
         </div>
+
+        {/* Mở Edit Channel Modal nếu open */}
+        <EditChannelModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          initialData={currentChannel ? {
+            id: currentChannel.id,
+            name: currentChannel.name,
+            description: currentChannel.description,
+            icon: "Hash",
+            role: "user", // chưa dùng
+            isPublic: true, // chưa dùng
+          } : null}
+          onSave={handleEditChannel}
+        />
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -136,10 +171,11 @@ const CommunityChat = () => {
                   user: message.user_profiles?.display_name || 'Unknown User',
                   avatar: message.user_profiles?.avatar_url || '/api/placeholder/32/32',
                   message: message.content,
-                  timestamp: new Date(message.created_at).toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  }),
+                  timestamp: new Date(message.created_at).toLocaleTimeString([],
+                    {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }),
                   role: (message.user_profiles?.role as 'admin' | 'mod' | 'user') || 'user',
                   replyTo: message.reply_message ? {
                     user: message.reply_message.user_profiles?.display_name || 'Unknown User',
@@ -174,3 +210,4 @@ const CommunityChat = () => {
 };
 
 export default CommunityChat;
+
