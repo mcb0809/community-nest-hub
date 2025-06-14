@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit, Eye, EyeOff, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,7 +38,8 @@ const CourseAdmin = () => {
 
   const fetchCourses = async () => {
     try {
-      const { data, error } = await supabase
+      // Use any to bypass TypeScript errors until types are regenerated
+      const { data, error } = await (supabase as any)
         .from('courses')
         .select(`
           *,
@@ -49,7 +49,7 @@ const CourseAdmin = () => {
 
       if (error) throw error;
 
-      const coursesWithLessonCount = data?.map(course => ({
+      const coursesWithLessonCount = data?.map((course: any) => ({
         ...course,
         lesson_count: course.lessons?.[0]?.count || 0
       })) || [];
@@ -69,7 +69,7 @@ const CourseAdmin = () => {
 
   const toggleCourseVisibility = async (courseId: string, isPublic: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('courses')
         .update({ is_public: !isPublic })
         .eq('id', courseId);
