@@ -13,6 +13,24 @@ import ChatSidebar from '@/components/chat/ChatSidebar';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 
+interface Message {
+  id: number;
+  user: string;
+  avatar: string;
+  message: string;
+  timestamp: string;
+  role: 'admin' | 'vip' | 'member';
+  replyTo?: {
+    user: string;
+    message: string;
+  };
+  reactions?: {
+    emoji: string;
+    count: number;
+    users: string[];
+  }[];
+}
+
 const CommunityChat = () => {
   const [selectedChannel, setSelectedChannel] = useState('general');
   const [replyTo, setReplyTo] = useState<{user: string; message: string} | undefined>();
@@ -25,14 +43,14 @@ const CommunityChat = () => {
     { id: 'random', name: 'random', description: 'Random discussions', members: 45 },
   ];
 
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
       user: 'John Smith',
       avatar: '/api/placeholder/32/32',
       message: 'Hey everyone! Just finished the React automation course. Amazing content! 🚀',
       timestamp: '2:30 PM',
-      role: 'admin' as const,
+      role: 'admin',
       reactions: [
         { emoji: '👍', count: 5, users: ['Alice', 'Bob'] },
         { emoji: '🚀', count: 2, users: ['Charlie'] }
@@ -44,7 +62,7 @@ const CommunityChat = () => {
       avatar: '/api/placeholder/32/32',
       message: 'Congratulations! How long did it take you to complete?',
       timestamp: '2:35 PM',
-      role: 'vip' as const,
+      role: 'vip',
       replyTo: {
         user: 'John Smith',
         message: 'Hey everyone! Just finished the React automation course...'
@@ -56,7 +74,7 @@ const CommunityChat = () => {
       avatar: '/api/placeholder/32/32',
       message: 'I\'m working on the same course. The AI integration part is fascinating! Anyone has tips for the advanced modules?',
       timestamp: '2:40 PM',
-      role: 'member' as const,
+      role: 'member',
       reactions: [
         { emoji: '💯', count: 3, users: ['Sarah', 'Alex'] }
       ]
@@ -66,13 +84,13 @@ const CommunityChat = () => {
   const currentChannel = channels.find(c => c.id === selectedChannel);
 
   const handleSendMessage = (message: string) => {
-    const newMessage = {
+    const newMessage: Message = {
       id: messages.length + 1,
       user: 'AI Learner',
       avatar: '/api/placeholder/32/32',
       message,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      role: 'member' as const,
+      role: 'member',
       replyTo: replyTo ? replyTo : undefined
     };
     
@@ -80,7 +98,7 @@ const CommunityChat = () => {
     setReplyTo(undefined);
   };
 
-  const handleReply = (message: any) => {
+  const handleReply = (message: Message) => {
     setReplyTo({
       user: message.user,
       message: message.message
