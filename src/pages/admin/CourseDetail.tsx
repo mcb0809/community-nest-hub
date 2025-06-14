@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Edit, Trash2, GripVertical, Play, FileText, Eye, EyeOff } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Plus, Edit, Trash2, GripVertical, Play, FileText, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +42,7 @@ interface Lesson {
 
 const CourseDetail = () => {
   const { courseId } = useParams();
+  const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
@@ -189,25 +189,35 @@ const CourseDetail = () => {
       {/* Course Header */}
       <div className="bg-gradient-to-r from-purple-900/50 to-cyan-900/50 rounded-lg p-6 glass border border-slate-600">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">{course.title}</h1>
-            <div className="flex items-center space-x-4">
-              <Badge variant="outline" className="border-purple-500/30 text-purple-400">
-                {course.category}
-              </Badge>
-              <Badge variant="outline" className="border-cyan-500/30 text-cyan-400">
-                Cấp độ {course.level}
-              </Badge>
-              <Badge 
-                variant={course.is_public ? "default" : "secondary"}
-                className={course.is_public ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}
-              >
-                {course.is_public ? 'Công khai' : 'Ẩn'}
-              </Badge>
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/course')}
+              className="border-slate-600 text-white hover:bg-slate-700"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Quay lại
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">{course.title}</h1>
+              <div className="flex items-center space-x-4">
+                <Badge variant="outline" className="border-purple-500/30 text-purple-400">
+                  {course.category}
+                </Badge>
+                <Badge variant="outline" className="border-cyan-500/30 text-cyan-400">
+                  Cấp độ {course.level}
+                </Badge>
+                <Badge 
+                  variant={course.is_public ? "default" : "secondary"}
+                  className={course.is_public ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}
+                >
+                  {course.is_public ? 'Công khai' : 'Ẩn'}
+                </Badge>
+              </div>
+              {course.description && (
+                <p className="text-slate-300 mt-2">{course.description}</p>
+              )}
             </div>
-            {course.description && (
-              <p className="text-slate-300 mt-2">{course.description}</p>
-            )}
           </div>
           
           <Dialog open={isModuleFormOpen} onOpenChange={setIsModuleFormOpen}>
