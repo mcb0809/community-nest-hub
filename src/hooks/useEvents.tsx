@@ -17,7 +17,7 @@ export interface Event {
   meeting_link: string | null;
   max_attendees: number;
   registered: number;
-  registered_users: any[] | null;
+  registered_users: string[] | null;
   tags: string[] | null;
   status: string;
   recording: string | null;
@@ -40,7 +40,15 @@ export const useEvents = () => {
         .order('date', { ascending: true });
 
       if (error) throw error;
-      setEvents(data || []);
+      
+      // Transform the data to ensure registered_users is properly typed
+      const transformedData = (data || []).map(event => ({
+        ...event,
+        registered_users: Array.isArray(event.registered_users) ? event.registered_users : [],
+        tags: Array.isArray(event.tags) ? event.tags : []
+      }));
+      
+      setEvents(transformedData);
     } catch (error: any) {
       console.error('Error fetching events:', error);
       toast({
@@ -66,12 +74,18 @@ export const useEvents = () => {
 
       if (error) throw error;
 
-      setEvents(prev => [...prev, data]);
+      const transformedData = {
+        ...data,
+        registered_users: Array.isArray(data.registered_users) ? data.registered_users : [],
+        tags: Array.isArray(data.tags) ? data.tags : []
+      };
+
+      setEvents(prev => [...prev, transformedData]);
       toast({
         title: "Success",
         description: "Event created successfully",
       });
-      return data;
+      return transformedData;
     } catch (error: any) {
       console.error('Error creating event:', error);
       toast({
@@ -97,12 +111,18 @@ export const useEvents = () => {
 
       if (error) throw error;
 
-      setEvents(prev => prev.map(event => event.id === id ? data : event));
+      const transformedData = {
+        ...data,
+        registered_users: Array.isArray(data.registered_users) ? data.registered_users : [],
+        tags: Array.isArray(data.tags) ? data.tags : []
+      };
+
+      setEvents(prev => prev.map(event => event.id === id ? transformedData : event));
       toast({
         title: "Success",
         description: "Event updated successfully",
       });
-      return data;
+      return transformedData;
     } catch (error: any) {
       console.error('Error updating event:', error);
       toast({
