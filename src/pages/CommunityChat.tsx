@@ -23,7 +23,7 @@ import { useChat } from '@/hooks/useChat';
 import { useMessageSearch } from '@/hooks/useMessageSearch';
 
 const CommunityChat = () => {
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, signOut, loading: authLoading, isAdmin } = useAuth();
   const {
     channels,
     messages,
@@ -167,15 +167,18 @@ const CommunityChat = () => {
             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
               <Bell className="w-4 h-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20"
-              onClick={() => setEditModalOpen(true)}
-              aria-label="Edit channel"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
+            {/* Only show Settings button for admin users */}
+            {isAdmin() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20"
+                onClick={() => setEditModalOpen(true)}
+                aria-label="Edit channel"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -196,20 +199,22 @@ const CommunityChat = () => {
           </div>
         )}
 
-        {/* Edit Channel Modal */}
-        <EditChannelModal
-          open={editModalOpen}
-          onOpenChange={setEditModalOpen}
-          initialData={currentChannel ? {
-            id: currentChannel.id,
-            name: currentChannel.name,
-            description: currentChannel.description,
-            icon: currentChannel.icon || "Hash",
-            role: "user",
-            isPublic: true,
-          } : null}
-          onSave={handleEditChannel}
-        />
+        {/* Edit Channel Modal - Only render for admin */}
+        {isAdmin() && (
+          <EditChannelModal
+            open={editModalOpen}
+            onOpenChange={setEditModalOpen}
+            initialData={currentChannel ? {
+              id: currentChannel.id,
+              name: currentChannel.name,
+              description: currentChannel.description,
+              icon: currentChannel.icon || "Hash",
+              role: "user",
+              isPublic: true,
+            } : null}
+            onSave={handleEditChannel}
+          />
+        )}
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
