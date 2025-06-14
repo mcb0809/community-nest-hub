@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
-  Send, 
+  ArrowUp, 
   Smile, 
   Paperclip,
   Mic,
@@ -218,7 +218,7 @@ const ChatInput = ({ selectedChannel, onSendMessage, replyTo, onCancelReply }: C
                   : "bg-slate-700 text-slate-400 cursor-not-allowed"
               )}
             >
-              <Send className="w-5 h-5" />
+              <ArrowUp className="w-5 h-5" />
             </Button>
           </div>
         </div>

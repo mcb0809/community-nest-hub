@@ -8,7 +8,8 @@ interface Channel {
   id: string;
   name: string;
   description: string;
-  members: number;
+  members?: number;
+  messageCount?: number;
   icon?: string;
 }
 
@@ -65,7 +66,7 @@ const ChannelItem = ({ channel, isSelected, onClick }: ChannelItemProps) => {
                   : "border-slate-600 text-slate-400"
               )}
             >
-              {channel.members}
+              {channel.messageCount || 0}
             </Badge>
           </div>
           <div className="text-xs opacity-70 truncate font-inter">

@@ -4,16 +4,22 @@ import { Hash, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ChannelItem from './ChannelItem';
 import CreateChannelModal from './CreateChannelModal';
-import { Channel } from '@/hooks/useChat';
+import { Channel, Message } from '@/hooks/useChat';
 
 interface ChatSidebarProps {
   channels: Channel[];
   selectedChannel: string;
+  messages: Message[];
   onChannelSelect: (channelId: string) => void;
   onCreateChannel: (name: string, description: string) => void;
 }
 
-const ChatSidebar = ({ channels, selectedChannel, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {
+const ChatSidebar = ({ channels, selectedChannel, messages, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {
+  // Tính số tin nhắn cho mỗi channel
+  const getMessageCountForChannel = (channelId: string) => {
+    return messages.filter(msg => msg.channel_id === channelId).length;
+  };
+
   return (
     <div className="w-80 glass-card border-r border-purple-500/20 flex flex-col">
       {/* Header */}
@@ -46,7 +52,7 @@ const ChatSidebar = ({ channels, selectedChannel, onChannelSelect, onCreateChann
               id: channel.id,
               name: channel.name,
               description: channel.description || '',
-              members: 0 // This could be calculated from online users
+              messageCount: getMessageCountForChannel(channel.id)
             }}
             isSelected={selectedChannel === channel.id}
             onClick={() => onChannelSelect(channel.id)}
