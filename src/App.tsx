@@ -4,8 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import DashboardLayout from "./components/layout/DashboardLayout";
-import Dashboard from "./pages/Dashboard";
+import Web3DashboardLayout from "./components/layout/Web3DashboardLayout";
+import Web3Dashboard from "./pages/Web3Dashboard";
 import CourseHub from "./pages/CourseHub";
 import CommunityChat from "./pages/CommunityChat";
 import EventHub from "./pages/EventHub";
@@ -21,9 +21,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <DashboardLayout>
+        <Web3DashboardLayout>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Web3Dashboard />} />
             <Route path="/courses" element={<CourseHub />} />
             <Route path="/chat" element={<CommunityChat />} />
             <Route path="/events" element={<EventHub />} />
@@ -31,7 +31,7 @@ const App = () => (
             <Route path="/members" element={<Members />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </DashboardLayout>
+        </Web3DashboardLayout>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
