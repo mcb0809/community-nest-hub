@@ -10,16 +10,12 @@ interface ChatSidebarProps {
   channels: Channel[];
   selectedChannel: string;
   messages: Message[];
+  unreadCounts: Record<string, number>;
   onChannelSelect: (channelId: string) => void;
   onCreateChannel: (name: string, description: string) => void;
 }
 
-const ChatSidebar = ({ channels, selectedChannel, messages, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {
-  // Tính số tin nhắn cho mỗi channel
-  const getMessageCountForChannel = (channelId: string) => {
-    return messages.filter(msg => msg.channel_id === channelId).length;
-  };
-
+const ChatSidebar = ({ channels, selectedChannel, messages, unreadCounts, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {
   return (
     <div className="w-80 glass-card border-r border-purple-500/20 flex flex-col">
       {/* Header */}
@@ -52,7 +48,7 @@ const ChatSidebar = ({ channels, selectedChannel, messages, onChannelSelect, onC
               id: channel.id,
               name: channel.name,
               description: channel.description || '',
-              messageCount: getMessageCountForChannel(channel.id)
+              unreadCount: unreadCounts[channel.id] || 0
             }}
             isSelected={selectedChannel === channel.id}
             onClick={() => onChannelSelect(channel.id)}

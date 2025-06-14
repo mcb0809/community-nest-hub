@@ -34,14 +34,15 @@ export interface Message {
     } | null;
   } | null;
   attachments: any[];
+  is_read?: boolean;
 }
 
 export const useChat = () => {
-  // Add a ref to prevent state update after channel changes
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -50,11 +51,12 @@ export const useChat = () => {
     loadChannels();
   }, []);
 
-  // Improved channel switching - clear messages immediately
+  // Enhanced channel switching - clear messages immediately and mark as read
   useEffect(() => {
     if (selectedChannel) {
       setMessages([]); // Clear immediately for smooth transition
       loadMessages(selectedChannel);
+      markChannelAsRead(selectedChannel);
     }
   }, [selectedChannel]);
 
@@ -72,6 +74,12 @@ export const useChat = () => {
         (payload) => {
           console.log('New message received:', payload);
           const newMsgData = payload.new;
+          
+          // Skip if this is our own message (already added optimistically)
+          if (newMsgData.user_id === user?.id) {
+            return;
+          }
+          
           setMessages((prev) => {
             if (prev.some(m => m.id === newMsgData.id)) return prev;
             
@@ -87,12 +95,22 @@ export const useChat = () => {
               updated_at: newMsgData.updated_at || '',
               user_profiles: null,
               reply_message: null,
-              attachments: []
+              attachments: [],
+              is_read: false
             };
             
             const updated = [...prev, newMessage];
             // Hydrate profiles in background
             hydrateMessageProfiles([newMessage]);
+            
+            // Update unread count for other channels
+            if (newMsgData.channel_id !== selectedChannel) {
+              setUnreadCounts(prev => ({
+                ...prev,
+                [newMsgData.channel_id]: (prev[newMsgData.channel_id] || 0) + 1
+              }));
+            }
+            
             return updated;
           });
         }
@@ -150,7 +168,40 @@ export const useChat = () => {
       supabase.removeChannel(realtimeChannel);
       supabase.removeChannel(channelsRealtime);
     };
-  }, [selectedChannel]);
+  }, [selectedChannel, user?.id]);
+
+  // Load unread counts for all channels
+  useEffect(() => {
+    if (user) {
+      loadUnreadCounts();
+    }
+  }, [user]);
+
+  const loadUnreadCounts = async () => {
+    if (!user) return;
+    
+    try {
+      // This is a simplified approach - in production you'd want a proper read_status table
+      const { data: channelsData } = await supabase
+        .from('channels')
+        .select('id');
+      
+      if (channelsData) {
+        const counts: Record<string, number> = {};
+        // For now, we'll use a simple approach - you can enhance this later
+        setUnreadCounts(counts);
+      }
+    } catch (error) {
+      console.error('Error loading unread counts:', error);
+    }
+  };
+
+  const markChannelAsRead = (channelId: string) => {
+    setUnreadCounts(prev => ({
+      ...prev,
+      [channelId]: 0
+    }));
+  };
 
   // Helper function to hydrate message profiles
   const hydrateMessageProfiles = async (messagesToHydrate: Message[]) => {
@@ -303,7 +354,8 @@ export const useChat = () => {
         updated_at: msg.updated_at || '',
         user_profiles: profilesMap.get(msg.user_id) || null,
         reply_message: msg.reply_to ? replyMessagesMap.get(msg.reply_to) : null,
-        attachments: msg.message_attachments || []
+        attachments: msg.message_attachments || [],
+        is_read: true
       }));
       
       setMessages(transformedMessages);
@@ -320,6 +372,30 @@ export const useChat = () => {
   const sendMessage = async (content: string, replyTo?: string, attachments?: any[]) => {
     if (!user || !selectedChannel) return;
 
+    // Create optimistic message immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: tempId,
+      channel_id: selectedChannel,
+      user_id: user.id,
+      content,
+      reactions: {},
+      reply_to: replyTo || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user_profiles: {
+        display_name: user.email || 'Unknown User',
+        avatar_url: null,
+        role: 'user'
+      },
+      reply_message: null,
+      attachments: attachments || [],
+      is_read: true
+    };
+
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, optimisticMessage]);
+
     try {
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
@@ -333,6 +409,13 @@ export const useChat = () => {
         .single();
 
       if (messageError) throw messageError;
+
+      // Replace optimistic message with real one
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId 
+          ? { ...optimisticMessage, id: messageData.id }
+          : msg
+      ));
 
       // Add attachments if any
       if (attachments && attachments.length > 0) {
@@ -354,6 +437,8 @@ export const useChat = () => {
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
       toast({
         title: "Error",
         description: "Failed to send message",
@@ -482,5 +567,6 @@ export const useChat = () => {
     createChannel,
     updateChannelReaction,
     editChannel,
+    unreadCounts,
   };
 };

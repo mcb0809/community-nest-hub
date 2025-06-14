@@ -9,7 +9,7 @@ interface Channel {
   name: string;
   description: string;
   members?: number;
-  messageCount?: number;
+  unreadCount?: number;
   icon?: string;
 }
 
@@ -32,6 +32,7 @@ const getChannelIcon = (channelName: string) => {
 
 const ChannelItem = ({ channel, isSelected, onClick }: ChannelItemProps) => {
   const IconComponent = getChannelIcon(channel.name);
+  const hasUnread = (channel.unreadCount || 0) > 0;
 
   return (
     <button
@@ -40,7 +41,8 @@ const ChannelItem = ({ channel, isSelected, onClick }: ChannelItemProps) => {
         "w-full group flex items-center p-3 rounded-xl transition-all duration-300 text-left relative overflow-hidden",
         isSelected 
           ? "bg-gradient-to-r from-purple-500/20 to-cyan-500/20 text-white border border-purple-500/40 neon-purple shadow-lg" 
-          : "text-slate-300 hover:bg-white/5 hover:text-white hover:border-purple-500/20 border border-transparent"
+          : "text-slate-300 hover:bg-white/5 hover:text-white hover:border-purple-500/20 border border-transparent",
+        hasUnread && !isSelected && "bg-purple-500/10 border-purple-500/20"
       )}
     >
       {/* Background glow effect */}
@@ -56,18 +58,20 @@ const ChannelItem = ({ channel, isSelected, onClick }: ChannelItemProps) => {
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <span className="font-medium font-inter truncate">{channel.name}</span>
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-xs ml-2",
-                isSelected 
-                  ? "border-purple-400/40 text-purple-300" 
-                  : "border-slate-600 text-slate-400"
-              )}
-            >
-              {channel.messageCount || 0}
-            </Badge>
+            <span className={cn(
+              "font-medium font-inter truncate",
+              hasUnread && !isSelected && "font-semibold"
+            )}>
+              {channel.name}
+            </span>
+            {hasUnread && !isSelected && (
+              <Badge 
+                variant="outline" 
+                className="text-xs ml-2 bg-purple-500 border-purple-400 text-white animate-pulse"
+              >
+                {channel.unreadCount}
+              </Badge>
+            )}
           </div>
           <div className="text-xs opacity-70 truncate font-inter">
             {channel.description}

@@ -34,6 +34,7 @@ const CommunityChat = () => {
     createChannel,
     updateChannelReaction,
     editChannel,
+    unreadCounts,
   } = useChat();
 
   const { searchQuery, setSearchQuery, filteredMessages, hasActiveSearch } = useMessageSearch(messages);
@@ -104,6 +105,7 @@ const CommunityChat = () => {
         channels={channels}
         selectedChannel={selectedChannel}
         messages={messages}
+        unreadCounts={unreadCounts}
         onChannelSelect={setSelectedChannel}
         onCreateChannel={createChannel}
       />
