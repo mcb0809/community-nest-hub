@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,11 +11,15 @@ import {
   CheckCircle, 
   Clock,
   BookOpen,
-  User
+  User,
+  Lock
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createSlug, extractIdFromSlug } from '@/utils/slugUtils';
+import { useAuth } from '@/hooks/useAuth';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
+import AuthRequiredModal from '@/components/auth/AuthRequiredModal';
 import CommentsSection from '@/components/course/CommentsSection';
 
 interface Course {
@@ -49,6 +54,8 @@ interface Lesson {
 const CourseViewer = () => {
   const { courseId, slug } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isAuthenticated, showAuthModal, requireAuth, closeAuthModal } = useAuthGuard();
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
@@ -122,9 +129,11 @@ const CourseViewer = () => {
 
       setModules(modulesWithLessons);
       
-      // Set first lesson as current lesson
+      // Set first preview lesson or first lesson if authenticated
       if (modulesWithLessons.length > 0 && modulesWithLessons[0].lessons.length > 0) {
-        setCurrentLesson(modulesWithLessons[0].lessons[0]);
+        const firstModule = modulesWithLessons[0];
+        const previewLesson = firstModule.lessons.find(lesson => lesson.is_preview);
+        setCurrentLesson(previewLesson || (isAuthenticated ? firstModule.lessons[0] : null));
       }
     } catch (error) {
       console.error('Error fetching course data:', error);
@@ -136,6 +145,14 @@ const CourseViewer = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLessonSelect = (lesson: Lesson) => {
+    if (!lesson.is_preview && !isAuthenticated) {
+      requireAuth();
+      return;
+    }
+    setCurrentLesson(lesson);
   };
 
   const extractYouTubeVideoId = (url: string) => {
@@ -191,6 +208,13 @@ const CourseViewer = () => {
 
   return (
     <div className="space-y-6">
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={closeAuthModal}
+        title="Yêu cầu đăng nhập để xem khóa học"
+        description="Bạn cần đăng nhập để truy cập toàn bộ nội dung khóa học. Chỉ có thể xem preview miễn phí."
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-120px)]">
         {/* Main Video/Content Area */}
         <div className="lg:col-span-3 space-y-4">
@@ -232,7 +256,14 @@ const CourseViewer = () => {
 
                   {/* Lesson Info */}
                   <div className="p-6">
-                    <h2 className="text-2xl font-bold text-white mb-2">{currentLesson.title}</h2>
+                    <div className="flex items-center justify-between mb-2">
+                      <h2 className="text-2xl font-bold text-white">{currentLesson.title}</h2>
+                      {currentLesson.is_preview && (
+                        <Badge variant="outline" className="border-green-500/30 text-green-400">
+                          Preview
+                        </Badge>
+                      )}
+                    </div>
                     
                     {/* Course Info */}
                     <div className="flex items-center space-x-4 mb-4 text-sm text-slate-400">
@@ -248,8 +279,21 @@ const CourseViewer = () => {
                       </Badge>
                     </div>
 
+                    {/* Auth Warning for non-preview content */}
+                    {!currentLesson.is_preview && !isAuthenticated && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-4">
+                        <div className="flex items-center space-x-2">
+                          <Lock className="w-5 h-5 text-yellow-400" />
+                          <span className="text-yellow-400 font-semibold">Nội dung này yêu cầu đăng nhập</span>
+                        </div>
+                        <p className="text-slate-300 text-sm mt-1">
+                          Bạn cần đăng nhập để xem toàn bộ nội dung khóa học.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Lesson Content */}
-                    {currentLesson.content_md && (
+                    {currentLesson.content_md && (currentLesson.is_preview || isAuthenticated) && (
                       <div className="prose prose-invert max-w-none">
                         <div className="bg-slate-800/50 p-4 rounded border border-slate-600">
                           <h3 className="text-white mb-3">Nội dung bài học:</h3>
@@ -261,7 +305,7 @@ const CourseViewer = () => {
                     )}
 
                     {/* Attachment */}
-                    {currentLesson.attachment_url && (
+                    {currentLesson.attachment_url && (currentLesson.is_preview || isAuthenticated) && (
                       <div className="mt-4">
                         <Button
                           variant="outline"
@@ -277,9 +321,25 @@ const CourseViewer = () => {
                 </div>
               ) : (
                 <div className="p-12 text-center">
-                  <Play className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">Chọn bài học để bắt đầu</h3>
-                  <p className="text-slate-400">Chọn một bài học từ danh sách bên cạnh</p>
+                  {!isAuthenticated ? (
+                    <div>
+                      <Lock className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-white mb-2">Yêu cầu đăng nhập</h3>
+                      <p className="text-slate-400 mb-4">Đăng nhập để truy cập toàn bộ nội dung khóa học</p>
+                      <Button 
+                        onClick={() => requireAuth()}
+                        className="bg-gradient-to-r from-purple-500 to-cyan-500"
+                      >
+                        Đăng nhập ngay
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Play className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-white mb-2">Chọn bài học để bắt đầu</h3>
+                      <p className="text-slate-400">Chọn một bài học từ danh sách bên cạnh</p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -318,39 +378,56 @@ const CourseViewer = () => {
                     </div>
                     
                     <div className="space-y-1">
-                      {module.lessons.map((lesson, lessonIndex) => (
-                        <button
-                          key={lesson.id}
-                          onClick={() => setCurrentLesson(lesson)}
-                          className={`w-full p-3 text-left transition-colors ${
-                            currentLesson?.id === lesson.id
-                              ? 'bg-purple-500/20 border-l-2 border-purple-500'
-                              : 'hover:bg-slate-700/50'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="flex-shrink-0">
-                              {currentLesson?.id === lesson.id ? (
-                                <Play className="w-4 h-4 text-purple-400" />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full border border-slate-500 text-xs flex items-center justify-center text-slate-400">
-                                  {lessonIndex + 1}
+                      {module.lessons.map((lesson, lessonIndex) => {
+                        const isAccessible = lesson.is_preview || isAuthenticated;
+                        return (
+                          <button
+                            key={lesson.id}
+                            onClick={() => handleLessonSelect(lesson)}
+                            disabled={!isAccessible}
+                            className={`w-full p-3 text-left transition-colors ${
+                              currentLesson?.id === lesson.id
+                                ? 'bg-purple-500/20 border-l-2 border-purple-500'
+                                : isAccessible 
+                                  ? 'hover:bg-slate-700/50'
+                                  : 'opacity-50 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-shrink-0">
+                                {!isAccessible ? (
+                                  <Lock className="w-4 h-4 text-slate-500" />
+                                ) : currentLesson?.id === lesson.id ? (
+                                  <Play className="w-4 h-4 text-purple-400" />
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full border border-slate-500 text-xs flex items-center justify-center text-slate-400">
+                                    {lessonIndex + 1}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium truncate ${
+                                  isAccessible ? 'text-white' : 'text-slate-500'
+                                }`}>
+                                  {lesson.title}
+                                </p>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  {lesson.is_preview && (
+                                    <Badge variant="outline" className="border-green-500/30 text-green-400 text-xs">
+                                      Preview
+                                    </Badge>
+                                  )}
+                                  {!isAccessible && (
+                                    <Badge variant="outline" className="border-slate-500/30 text-slate-500 text-xs">
+                                      Cần đăng nhập
+                                    </Badge>
+                                  )}
                                 </div>
-                              )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white font-medium truncate">
-                                {lesson.title}
-                              </p>
-                              {lesson.is_preview && (
-                                <Badge variant="outline" className="border-green-500/30 text-green-400 text-xs mt-1">
-                                  Preview
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -360,8 +437,8 @@ const CourseViewer = () => {
         </div>
       </div>
 
-      {/* Comments Section */}
-      <CommentsSection courseId={course.id} />
+      {/* Comments Section - Only show if authenticated */}
+      {isAuthenticated && <CommentsSection courseId={course.id} />}
     </div>
   );
 };

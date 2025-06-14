@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
 import {
   Hash,
   Users,
@@ -18,12 +17,15 @@ import ChatSidebar from '@/components/chat/ChatSidebar';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import EditChannelModal from '@/components/chat/EditChannelModal';
+import AuthRequiredModal from '@/components/auth/AuthRequiredModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useChat } from '@/hooks/useChat';
 import { useMessageSearch } from '@/hooks/useMessageSearch';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 const CommunityChat = () => {
   const { user, signOut, loading: authLoading, isAdmin } = useAuth();
+  const { isAuthenticated, showAuthModal, requireAuth, closeAuthModal } = useAuthGuard();
   const {
     channels,
     messages,
@@ -54,15 +56,44 @@ const CommunityChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Redirect to auth if not logged in
-  if (!authLoading && !user) {
-    return <Navigate to="/auth" replace />;
-  }
+  // Show auth modal if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      requireAuth();
+    }
+  }, [user, authLoading, requireAuth]);
 
   if (authLoading || chatLoading) {
     return (
       <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900/10 to-slate-900">
         <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // If not authenticated, show blurred background with auth modal
+  if (!isAuthenticated) {
+    return (
+      <div className="h-[calc(100vh-8rem)] relative bg-gradient-to-br from-slate-900 via-purple-900/10 to-slate-900">
+        {/* Blurred background */}
+        <div className="absolute inset-0 backdrop-blur-sm bg-black/50 z-10"></div>
+        
+        {/* Mock chat interface (blurred) */}
+        <div className="h-full flex blur-sm">
+          <div className="w-80 glass-card border-r border-purple-500/20 bg-slate-900/50"></div>
+          <div className="flex-1 flex flex-col">
+            <div className="h-16 glass-card border-b border-purple-500/20 bg-slate-900/50"></div>
+            <div className="flex-1 bg-slate-900/30"></div>
+          </div>
+        </div>
+
+        {/* Auth Required Modal */}
+        <AuthRequiredModal
+          isOpen={showAuthModal}
+          onClose={closeAuthModal}
+          title="Yêu cầu đăng nhập để truy cập Chat"
+          description="Bạn cần đăng nhập để tham gia chat cộng đồng và tương tác với các thành viên khác."
+        />
       </div>
     );
   }
