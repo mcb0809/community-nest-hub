@@ -122,7 +122,16 @@ export const useChat = () => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      // Transform the data to match our Message interface
+      const transformedMessages: Message[] = (data || []).map(msg => ({
+        ...msg,
+        reactions: typeof msg.reactions === 'object' && msg.reactions !== null 
+          ? msg.reactions as Record<string, string[]>
+          : {}
+      }));
+      
+      setMessages(transformedMessages);
     } catch (error) {
       console.error('Error loading messages:', error);
       toast({
@@ -197,10 +206,10 @@ export const useChat = () => {
 
       if (fetchError) throw fetchError;
 
-      const currentReactions = message.reactions || {};
+      const currentReactions = (message.reactions as Record<string, string[]>) || {};
       const userReactions = currentReactions[emoji] || [];
       
-      let newReactions;
+      let newReactions: Record<string, string[]>;
       if (userReactions.includes(user.id)) {
         // Remove user's reaction
         newReactions = {

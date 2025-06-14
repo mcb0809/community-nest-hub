@@ -8,7 +8,7 @@ import EmojiReactionRow from './EmojiReactionRow';
 import ReplyTag from './ReplyTag';
 
 interface Message {
-  id: number;
+  id: string;
   user: string;
   avatar: string;
   message: string;
@@ -28,7 +28,7 @@ interface Message {
 interface MessageBubbleProps {
   message: Message;
   onReply: (message: Message) => void;
-  onReact: (messageId: number, emoji: string) => void;
+  onReact: (messageId: string, emoji: string) => void;
 }
 
 const getRoleConfig = (role: string) => {

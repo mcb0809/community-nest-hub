@@ -59,8 +59,8 @@ const CommunityChat = () => {
   const handleReply = (message: any) => {
     setReplyTo({
       messageId: message.id,
-      user: message.user_profiles?.display_name || 'Unknown User',
-      message: message.content
+      user: message.user,
+      message: message.message
     });
   };
 
@@ -153,7 +153,7 @@ const CommunityChat = () => {
                   }))
                 }}
                 onReply={handleReply}
-                onReact={(messageId, emoji) => handleReact(messageId, emoji)}
+                onReact={handleReact}
               />
             ))}
           </div>
