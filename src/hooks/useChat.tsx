@@ -32,6 +32,7 @@ export interface Message {
       display_name: string;
     } | null;
   } | null;
+  attachments: any[];
 }
 
 export const useChat = () => {
@@ -48,70 +49,82 @@ export const useChat = () => {
     loadChannels();
   }, []);
 
-  // Load messages when channel changes
+  // Improved channel switching - clear messages immediately
   useEffect(() => {
     if (selectedChannel) {
-      setMessages([]); // Reset messages immediately for smooth UI
+      setMessages([]); // Clear immediately for smooth transition
       loadMessages(selectedChannel);
     }
   }, [selectedChannel]);
 
-  // Setup realtime subscriptions per channel
+  // Enhanced realtime subscriptions
   useEffect(() => {
     if (!selectedChannel) return;
 
-    // Clear messages when channel changes (already set above)
-    // Subscribe realtime for only selected channel
     const realtimeChannel = supabase.channel(`messages:${selectedChannel}`);
 
-    // Listen only for events in current channel
+    // Real-time message events
     realtimeChannel
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${selectedChannel}` },
         (payload) => {
+          console.log('New message received:', payload);
           const newMsgData = payload.new;
           setMessages((prev) => {
-            // Avoid duplicate if somehow message already in list (due to both initial fetch & real-time)
             if (prev.some(m => m.id === newMsgData.id)) return prev;
-            return [
-              ...prev,
-              {
-                id: newMsgData.id,
-                channel_id: newMsgData.channel_id || '',
-                user_id: newMsgData.user_id || '',
-                content: newMsgData.content,
-                reactions: typeof newMsgData.reactions === 'object' && newMsgData.reactions !== null ? newMsgData.reactions : {},
-                reply_to: newMsgData.reply_to,
-                created_at: newMsgData.created_at || '',
-                updated_at: newMsgData.updated_at || '',
-                user_profiles: null, // Will hydrate after
-                reply_message: null // Will hydrate after
-              }
-            ];
+            
+            // Add message immediately with basic data
+            const newMessage: Message = {
+              id: newMsgData.id,
+              channel_id: newMsgData.channel_id || '',
+              user_id: newMsgData.user_id || '',
+              content: newMsgData.content,
+              reactions: typeof newMsgData.reactions === 'object' && newMsgData.reactions !== null ? newMsgData.reactions : {},
+              reply_to: newMsgData.reply_to,
+              created_at: newMsgData.created_at || '',
+              updated_at: newMsgData.updated_at || '',
+              user_profiles: null,
+              reply_message: null
+            };
+            
+            const updated = [...prev, newMessage];
+            // Hydrate profiles in background
+            hydrateMessageProfiles([newMessage]);
+            return updated;
           });
-          // Hydrate profiles async (for demo purposes, can optimize)
-          loadMessages(selectedChannel);
         }
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'messages', filter: `channel_id=eq.${selectedChannel}` },
-        () => {
-          // For now just reload messages (can optimize partial update if needed)
-          loadMessages(selectedChannel);
+        (payload) => {
+          console.log('Message updated:', payload);
+          const updatedMsg = payload.new;
+          setMessages(prev => prev.map(msg => 
+            msg.id === updatedMsg.id 
+              ? {
+                  ...msg,
+                  content: updatedMsg.content,
+                  reactions: typeof updatedMsg.reactions === 'object' && updatedMsg.reactions !== null ? updatedMsg.reactions : {},
+                  updated_at: updatedMsg.updated_at || msg.updated_at
+                }
+              : msg
+          ));
         }
       )
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'messages', filter: `channel_id=eq.${selectedChannel}` },
-        () => {
-          loadMessages(selectedChannel);
+        (payload) => {
+          console.log('Message deleted:', payload);
+          const deletedMsg = payload.old;
+          setMessages(prev => prev.filter(msg => msg.id !== deletedMsg.id));
         }
       )
       .subscribe();
 
-    // Listen for channel meta data changes (edit channel)
+    // Channel metadata changes
     const channelsRealtime = supabase
       .channel('channels-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
@@ -124,6 +137,59 @@ export const useChat = () => {
       supabase.removeChannel(channelsRealtime);
     };
   }, [selectedChannel]);
+
+  // Helper function to hydrate message profiles
+  const hydrateMessageProfiles = async (messagesToHydrate: Message[]) => {
+    try {
+      const userIds = [...new Set(messagesToHydrate.map(msg => msg.user_id).filter(Boolean))];
+      const replyMessageIds = [...new Set(messagesToHydrate.map(msg => msg.reply_to).filter(Boolean))];
+
+      // Fetch user profiles
+      const { data: profilesData } = await supabase
+        .from('user_profiles')
+        .select('id, display_name, avatar_url, role')
+        .in('id', userIds);
+
+      // Fetch reply messages
+      let replyMessagesData: any[] = [];
+      if (replyMessageIds.length > 0) {
+        const { data: replyData } = await supabase
+          .from('messages')
+          .select('id, content, user_id')
+          .in('id', replyMessageIds);
+        replyMessagesData = replyData || [];
+      }
+
+      // Create maps
+      const profilesMap = new Map();
+      (profilesData || []).forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+
+      const replyMessagesMap = new Map();
+      replyMessagesData.forEach(reply => {
+        const profile = profilesMap.get(reply.user_id);
+        replyMessagesMap.set(reply.id, {
+          content: reply.content,
+          user_profiles: profile ? { display_name: profile.display_name } : null
+        });
+      });
+
+      // Update messages with profile data
+      setMessages(prev => prev.map(msg => {
+        if (messagesToHydrate.some(m => m.id === msg.id)) {
+          return {
+            ...msg,
+            user_profiles: profilesMap.get(msg.user_id) || null,
+            reply_message: msg.reply_to ? replyMessagesMap.get(msg.reply_to) : null
+          };
+        }
+        return msg;
+      }));
+    } catch (error) {
+      console.error('Error hydrating profiles:', error);
+    }
+  };
 
   const loadChannels = async () => {
     try {
@@ -152,10 +218,18 @@ export const useChat = () => {
 
   const loadMessages = async (channelId: string) => {
     try {
-      // First, get messages with basic info
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select('*')
+        .select(`
+          *,
+          message_attachments (
+            id,
+            file_name,
+            file_type,
+            file_size,
+            file_url
+          )
+        `)
         .eq('channel_id', channelId)
         .order('created_at', { ascending: true });
 
@@ -171,37 +245,27 @@ export const useChat = () => {
       const replyMessageIds = [...new Set(messagesData.map(msg => msg.reply_to).filter(Boolean))];
 
       // Fetch user profiles
-      const { data: profilesData, error: profilesError } = await supabase
+      const { data: profilesData } = await supabase
         .from('user_profiles')
         .select('id, display_name, avatar_url, role')
         .in('id', userIds);
 
-      if (profilesError) {
-        console.error('Error loading profiles:', profilesError);
-      }
-
-      // Fetch reply messages if any
+      // Fetch reply messages
       let replyMessagesData: any[] = [];
       if (replyMessageIds.length > 0) {
-        const { data: replyData, error: replyError } = await supabase
+        const { data: replyData } = await supabase
           .from('messages')
           .select('id, content, user_id')
           .in('id', replyMessageIds);
-
-        if (replyError) {
-          console.error('Error loading reply messages:', replyError);
-        } else {
-          replyMessagesData = replyData || [];
-        }
+        replyMessagesData = replyData || [];
       }
 
-      // Create profiles map for quick lookup
+      // Create maps
       const profilesMap = new Map();
       (profilesData || []).forEach(profile => {
         profilesMap.set(profile.id, profile);
       });
 
-      // Create reply messages map
       const replyMessagesMap = new Map();
       replyMessagesData.forEach(reply => {
         const profile = profilesMap.get(reply.user_id);
@@ -211,7 +275,7 @@ export const useChat = () => {
         });
       });
 
-      // Transform messages with proper typing
+      // Transform messages
       const transformedMessages: Message[] = messagesData.map(msg => ({
         id: msg.id,
         channel_id: msg.channel_id || '',
@@ -224,7 +288,8 @@ export const useChat = () => {
         created_at: msg.created_at || '',
         updated_at: msg.updated_at || '',
         user_profiles: profilesMap.get(msg.user_id) || null,
-        reply_message: msg.reply_to ? replyMessagesMap.get(msg.reply_to) : null
+        reply_message: msg.reply_to ? replyMessagesMap.get(msg.reply_to) : null,
+        attachments: msg.message_attachments || []
       }));
       
       setMessages(transformedMessages);
@@ -238,20 +303,41 @@ export const useChat = () => {
     }
   };
 
-  const sendMessage = async (content: string, replyTo?: string) => {
+  const sendMessage = async (content: string, replyTo?: string, attachments?: any[]) => {
     if (!user || !selectedChannel) return;
 
     try {
-      const { error } = await supabase
+      const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert({
           channel_id: selectedChannel,
           user_id: user.id,
           content,
           reply_to: replyTo || null,
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (messageError) throw messageError;
+
+      // Add attachments if any
+      if (attachments && attachments.length > 0) {
+        const attachmentInserts = attachments.map(attachment => ({
+          message_id: messageData.id,
+          file_name: attachment.file_name,
+          file_type: attachment.file_type,
+          file_size: attachment.file_size,
+          file_url: attachment.file_url
+        }));
+
+        const { error: attachmentError } = await supabase
+          .from('message_attachments')
+          .insert(attachmentInserts);
+
+        if (attachmentError) {
+          console.error('Error saving attachments:', attachmentError);
+        }
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -262,7 +348,7 @@ export const useChat = () => {
     }
   };
 
-  const createChannel = async (name: string, description: string) => {
+  const createChannel = async (name: string, description: string, icon: string = 'Hash') => {
     if (!user) return;
 
     try {
@@ -271,6 +357,7 @@ export const useChat = () => {
         .insert({
           name,
           description,
+          icon,
           created_by: user.id,
         });
 
@@ -293,7 +380,6 @@ export const useChat = () => {
     if (!user) return;
 
     try {
-      // Get current message
       const { data: message, error: fetchError } = await supabase
         .from('messages')
         .select('reactions')
@@ -307,17 +393,14 @@ export const useChat = () => {
       
       let newReactions: Record<string, string[]>;
       if (userReactions.includes(user.id)) {
-        // Remove user's reaction
         newReactions = {
           ...currentReactions,
           [emoji]: userReactions.filter((id: string) => id !== user.id)
         };
-        // Remove emoji if no reactions left
         if (newReactions[emoji].length === 0) {
           delete newReactions[emoji];
         }
       } else {
-        // Add user's reaction
         newReactions = {
           ...currentReactions,
           [emoji]: [...userReactions, user.id]
@@ -340,35 +423,28 @@ export const useChat = () => {
     }
   };
 
-  // Thêm function editChannel
-  const editChannel = async (
-    channelId: string,
-    name: string,
-    description: string,
-    icon: string
-  ) => {
+  const editChannel = async (channelId: string, name: string, description: string, icon: string) => {
     try {
       const { error } = await supabase
         .from('channels')
         .update({
           name,
           description,
-          // Có thể lưu icon vào cột mới nếu db có cột icon.
+          icon,
         })
         .eq('id', channelId);
 
       if (error) throw error;
       toast({
-        title: "Thành công",
-        description: "Cập nhật kênh thành công",
+        title: "Success",
+        description: "Channel updated successfully",
       });
-      // Reload lại channels, giữ nguyên kênh đang chọn
       await loadChannels();
     } catch (error) {
       console.error('Error editing channel:', error);
       toast({
-        title: "Lỗi",
-        description: "Cập nhật kênh thất bại",
+        title: "Error",
+        description: "Failed to update channel",
         variant: "destructive",
       });
     }
@@ -383,6 +459,6 @@ export const useChat = () => {
     sendMessage,
     createChannel,
     updateChannelReaction,
-    editChannel, // nhớ thêm vào return object
+    editChannel,
   };
 };

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -29,7 +28,7 @@ const CommunityChat = () => {
     sendMessage,
     createChannel,
     updateChannelReaction,
-    editChannel, // Thêm function nếu có
+    editChannel,
   } = useChat();
 
   const [replyTo, setReplyTo] = useState<{
@@ -56,8 +55,8 @@ const CommunityChat = () => {
 
   const currentChannel = channels.find(c => c.id === selectedChannel);
 
-  const handleSendMessage = (message: string) => {
-    sendMessage(message, replyTo?.messageId);
+  const handleSendMessage = (message: string, replyToId?: string, attachments?: any[]) => {
+    sendMessage(message, replyToId || replyTo?.messageId, attachments);
     setReplyTo(undefined);
   };
 
@@ -78,10 +77,16 @@ const CommunityChat = () => {
   };
 
   // NEW: callback lưu
-  const handleEditChannel = (data: { id: string; name: string; description: string; icon: string }) => {
+  const handleEditChannel = (data: { 
+    id: string; 
+    name: string; 
+    description: string; 
+    icon: string; 
+    permissions: any 
+  }) => {
     if(!editChannel) return;
     editChannel(data.id, data.name, data.description, data.icon);
-    // reload handled in hook
+    console.log('Channel permissions:', data.permissions); // For future implementation
   };
 
   return (
@@ -100,7 +105,10 @@ const CommunityChat = () => {
         <div className="h-16 glass-card border-b border-purple-500/20 flex items-center justify-between px-6">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-lg flex items-center justify-center">
-              <Hash className="w-4 h-4 text-white" />
+              {currentChannel?.icon && (() => {
+                const Icon = icons[currentChannel.icon as keyof typeof icons];
+                return Icon ? <Icon className="w-4 h-4 text-white" /> : <Hash className="w-4 h-4 text-white" />;
+              })()}
             </div>
             <div>
               <h3 className="text-lg font-bold text-white font-space">
@@ -130,7 +138,7 @@ const CommunityChat = () => {
               size="sm"
               className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20"
               onClick={() => setEditModalOpen(true)}
-              aria-label="Chỉnh sửa kênh"
+              aria-label="Edit channel"
             >
               <Settings className="w-4 h-4" />
             </Button>
@@ -153,7 +161,7 @@ const CommunityChat = () => {
             id: currentChannel.id,
             name: currentChannel.name,
             description: currentChannel.description,
-            icon: "Hash",
+            icon: currentChannel.icon || "Hash",
             role: "user", // chưa dùng
             isPublic: true, // chưa dùng
           } : null}
@@ -185,7 +193,8 @@ const CommunityChat = () => {
                     emoji,
                     count: (users as string[]).length,
                     users: users as string[]
-                  }))
+                  })),
+                  attachments: message.attachments || []
                 }}
                 onReply={handleReply}
                 onReact={handleReact}
@@ -210,4 +219,3 @@ const CommunityChat = () => {
 };
 
 export default CommunityChat;
-

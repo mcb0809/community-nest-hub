@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Reply, MoreHorizontal } from 'lucide-react';
 import EmojiReactionRow from './EmojiReactionRow';
 import ReplyTag from './ReplyTag';
+import FileAttachment from './FileAttachment';
 
 interface Message {
   id: string;
@@ -22,6 +23,13 @@ interface Message {
     emoji: string;
     count: number;
     users: string[];
+  }[];
+  attachments?: {
+    id: string;
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    file_url: string;
   }[];
 }
 
@@ -87,9 +95,26 @@ const MessageBubble = ({ message, onReply, onReact }: MessageBubbleProps) => {
           </div>
           
           {/* Message Content */}
-          <div className="text-slate-300 font-inter leading-relaxed mb-2">
-            {message.message}
-          </div>
+          {message.message && (
+            <div className="text-slate-300 font-inter leading-relaxed mb-2">
+              {message.message}
+            </div>
+          )}
+          
+          {/* File Attachments */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="space-y-2 mb-2">
+              {message.attachments.map((attachment) => (
+                <FileAttachment
+                  key={attachment.id}
+                  fileName={attachment.file_name}
+                  fileType={attachment.file_type}
+                  fileSize={attachment.file_size}
+                  fileUrl={attachment.file_url}
+                />
+              ))}
+            </div>
+          )}
           
           {/* Reactions */}
           {message.reactions && message.reactions.length > 0 && (
