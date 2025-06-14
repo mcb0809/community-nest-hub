@@ -9,11 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import EditUserModal from '@/components/admin/EditUserModal';
 
 interface UserProfile {
   id: string;
   display_name: string;
   avatar_url: string | null;
+  email: string | null;
   role: string;
   created_at: string;
   updated_at: string;
@@ -24,6 +26,8 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -78,8 +82,20 @@ const AdminUsers = () => {
     }
   };
 
+  const handleEditUser = (user: UserProfile) => {
+    setEditingUser(user);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUserUpdated = (updatedUser: UserProfile) => {
+    setUsers(users.map(user => 
+      user.id === updatedUser.id ? updatedUser : user
+    ));
+  };
+
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.display_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = user.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -157,7 +173,7 @@ const AdminUsers = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
           <Input
-            placeholder="Tìm kiếm người dùng..."
+            placeholder="Tìm kiếm người dùng (tên hoặc email)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder-slate-400"
@@ -207,9 +223,9 @@ const AdminUsers = () => {
             <TableHeader>
               <TableRow className="border-slate-700">
                 <TableHead className="text-slate-300">Người dùng</TableHead>
+                <TableHead className="text-slate-300">Email</TableHead>
                 <TableHead className="text-slate-300">Quyền</TableHead>
                 <TableHead className="text-slate-300">Ngày tạo</TableHead>
-                <TableHead className="text-slate-300">Cập nhật</TableHead>
                 <TableHead className="text-slate-300">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
@@ -237,6 +253,9 @@ const AdminUsers = () => {
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell className="text-slate-300">
+                    {user.email || <span className="text-slate-500 italic">Chưa có email</span>}
+                  </TableCell>
                   <TableCell>
                     <Badge className={roleColors[user.role as keyof typeof roleColors] || 'bg-gray-500/20 text-gray-400'}>
                       {user.role}
@@ -245,40 +264,48 @@ const AdminUsers = () => {
                   <TableCell className="text-slate-300">
                     {new Date(user.created_at).toLocaleDateString('vi-VN')}
                   </TableCell>
-                  <TableCell className="text-slate-300">
-                    {new Date(user.updated_at).toLocaleDateString('vi-VN')}
-                  </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="bg-slate-800 border-slate-600">
-                        <DropdownMenuItem
-                          onClick={() => updateUserRole(user.id, 'admin')}
-                          className="text-white hover:bg-slate-700"
-                        >
-                          <Shield className="w-4 h-4 mr-2" />
-                          Đặt làm Admin
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => updateUserRole(user.id, 'moderator')}
-                          className="text-white hover:bg-slate-700"
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Đặt làm Moderator
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => updateUserRole(user.id, 'member')}
-                          className="text-white hover:bg-slate-700"
-                        >
-                          <Mail className="w-4 h-4 mr-2" />
-                          Đặt làm Member
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEditUser(user)}
+                        className="text-slate-400 hover:text-white hover:bg-slate-700"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white">
+                            <Shield className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="bg-slate-800 border-slate-600">
+                          <DropdownMenuItem
+                            onClick={() => updateUserRole(user.id, 'admin')}
+                            className="text-white hover:bg-slate-700"
+                          >
+                            <Shield className="w-4 h-4 mr-2" />
+                            Đặt làm Admin
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateUserRole(user.id, 'moderator')}
+                            className="text-white hover:bg-slate-700"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Đặt làm Moderator
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateUserRole(user.id, 'member')}
+                            className="text-white hover:bg-slate-700"
+                          >
+                            <Mail className="w-4 h-4 mr-2" />
+                            Đặt làm Member
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -294,6 +321,13 @@ const AdminUsers = () => {
           <p className="text-slate-400">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc</p>
         </div>
       )}
+
+      <EditUserModal
+        user={editingUser}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onUserUpdated={handleUserUpdated}
+      />
     </div>
   );
 };
