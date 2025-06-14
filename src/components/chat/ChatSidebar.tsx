@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import ChannelItem from './ChannelItem';
 import CreateChannelModal from './CreateChannelModal';
 import { Channel, Message } from '@/hooks/useChat';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ChatSidebarProps {
   channels: Channel[];
@@ -16,6 +17,8 @@ interface ChatSidebarProps {
 }
 
 const ChatSidebar = ({ channels, selectedChannel, messages, unreadCounts, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {
+  const { isAdmin } = useAuth();
+
   return (
     <div className="w-80 glass-card border-r border-purple-500/20 flex flex-col">
       {/* Header */}
@@ -32,7 +35,10 @@ const ChatSidebar = ({ channels, selectedChannel, messages, unreadCounts, onChan
           </div>
         </div>
         
-        <CreateChannelModal onCreateChannel={onCreateChannel} />
+        {/* Only show Create Channel button for admin users */}
+        {isAdmin() && (
+          <CreateChannelModal onCreateChannel={onCreateChannel} />
+        )}
       </div>
       
       {/* Channels List */}
