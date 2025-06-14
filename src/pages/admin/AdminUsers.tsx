@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, UserPlus, Edit, Trash2, Shield, Mail, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -91,6 +90,9 @@ const AdminUsers = () => {
     setUsers(users.map(user => 
       user.id === updatedUser.id ? updatedUser : user
     ));
+    
+    // Refresh the users list to ensure data consistency
+    fetchUsers();
   };
 
   const filteredUsers = users.filter(user => {
@@ -249,12 +251,18 @@ const AdminUsers = () => {
                       </div>
                       <div>
                         <p className="font-medium text-white">{user.display_name}</p>
-                        <p className="text-sm text-slate-400">{user.id}</p>
+                        <p className="text-sm text-slate-400 truncate max-w-[200px]">{user.id}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="text-slate-300">
-                    {user.email || <span className="text-slate-500 italic">Chưa có email</span>}
+                    {user.email ? (
+                      <div className="max-w-[200px]">
+                        <p className="truncate" title={user.email}>{user.email}</p>
+                      </div>
+                    ) : (
+                      <span className="text-slate-500 italic">Chưa có email</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge className={roleColors[user.role as keyof typeof roleColors] || 'bg-gray-500/20 text-gray-400'}>

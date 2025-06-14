@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import AdminProtectedRoute from "@/components/auth/AdminProtectedRoute";
 import Web3DashboardLayout from "./components/layout/Web3DashboardLayout";
 import AdminLayout from "./components/layout/AdminLayout";
 import Web3Dashboard from "./pages/Web3Dashboard";
@@ -33,22 +34,24 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             
-            {/* Admin Routes */}
+            {/* Admin Routes - Protected */}
             <Route path="/admin/*" element={
-              <AdminLayout>
-                <Routes>
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="users" element={<AdminUsers />} />
-                  <Route path="course" element={<CourseAdmin />} />
-                  <Route path="course/:courseId" element={<CourseDetail />} />
-                  <Route path="messages" element={<div className="text-white">Messages Management - Coming Soon</div>} />
-                  <Route path="events" element={<div className="text-white">Events Management - Coming Soon</div>} />
-                  <Route path="documents" element={<div className="text-white">Documents Management - Coming Soon</div>} />
-                  <Route path="database" element={<div className="text-white">Database Management - Coming Soon</div>} />
-                  <Route path="analytics" element={<div className="text-white">Analytics - Coming Soon</div>} />
-                  <Route path="settings" element={<div className="text-white">Settings - Coming Soon</div>} />
-                </Routes>
-              </AdminLayout>
+              <AdminProtectedRoute>
+                <AdminLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="users" element={<AdminUsers />} />
+                    <Route path="course" element={<CourseAdmin />} />
+                    <Route path="course/:courseId" element={<CourseDetail />} />
+                    <Route path="messages" element={<div className="text-white">Messages Management - Coming Soon</div>} />
+                    <Route path="events" element={<div className="text-white">Events Management - Coming Soon</div>} />
+                    <Route path="documents" element={<div className="text-white">Documents Management - Coming Soon</div>} />
+                    <Route path="database" element={<div className="text-white">Database Management - Coming Soon</div>} />
+                    <Route path="analytics" element={<div className="text-white">Analytics - Coming Soon</div>} />
+                    <Route path="settings" element={<div className="text-white">Settings - Coming Soon</div>} />
+                  </Routes>
+                </AdminLayout>
+              </AdminProtectedRoute>
             } />
             
             {/* User Routes */}
