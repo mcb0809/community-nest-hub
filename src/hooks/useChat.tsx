@@ -112,10 +112,10 @@ export const useChat = () => {
         .from('messages')
         .select(`
           *,
-          user_profiles (display_name, avatar_url, role),
+          user_profiles!inner (display_name, avatar_url, role),
           reply_message:reply_to (
             content,
-            user_profiles (display_name)
+            user_profiles!inner (display_name)
           )
         `)
         .eq('channel_id', channelId)
