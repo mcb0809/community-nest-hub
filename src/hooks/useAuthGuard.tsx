@@ -5,11 +5,12 @@ import { useAuth } from '@/hooks/useAuth';
 export const useAuthGuard = () => {
   const { user, loading } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [manuallyDismissed, setManuallyDismissed] = useState(false);
 
   const requireAuth = (callback?: () => void) => {
     if (loading) return false;
     
-    if (!user) {
+    if (!user && !manuallyDismissed) {
       setShowAuthModal(true);
       return false;
     }
@@ -20,6 +21,7 @@ export const useAuthGuard = () => {
 
   const closeAuthModal = () => {
     setShowAuthModal(false);
+    setManuallyDismissed(true);
   };
 
   return {

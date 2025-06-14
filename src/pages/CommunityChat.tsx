@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Hash,
@@ -56,12 +55,12 @@ const CommunityChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Show auth modal if not authenticated
+  // Only show auth modal on initial load, not when manually dismissed
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading) {
       requireAuth();
     }
-  }, [user, authLoading, requireAuth]);
+  }, [authLoading]);
 
   if (authLoading || chatLoading) {
     return (
