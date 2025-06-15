@@ -135,6 +135,54 @@ export const useChat = (channelId?: string) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  // Handle real-time message updates
+  const handleRealtimeMessage = async (payload: any) => {
+    console.log('Change received!', payload);
+    
+    if (payload.eventType === 'INSERT') {
+      // Fetch user profile for the new message
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('id, display_name, avatar_url, email')
+        .eq('id', payload.new.user_id)
+        .single();
+
+      // Fetch attachments for the new message
+      const { data: attachments } = await supabase
+        .from('message_attachments')
+        .select('*')
+        .eq('message_id', payload.new.id);
+
+      const newMessage: Message = {
+        ...payload.new,
+        reactions: payload.new.reactions || {},
+        user_profiles: userProfile ? {
+          display_name: userProfile.display_name,
+          avatar_url: userProfile.avatar_url,
+          email: userProfile.email
+        } : undefined,
+        message_attachments: attachments || []
+      };
+
+      // Add new message to existing messages instead of refetching all
+      setMessages(prev => {
+        // Check if message already exists to avoid duplicates
+        if (prev.some(msg => msg.id === newMessage.id)) {
+          return prev;
+        }
+        return [...prev, newMessage];
+      });
+      
+      scrollToBottom();
+    } else if (payload.eventType === 'UPDATE') {
+      setMessages(prev => prev.map(msg => 
+        msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
+      ));
+    } else if (payload.eventType === 'DELETE') {
+      setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
+    }
+  };
+
   useEffect(() => {
     fetchChannels();
   }, []);
@@ -149,11 +197,7 @@ export const useChat = (channelId?: string) => {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'messages', filter: `channel_id=eq.${targetChannelId}` },
-          (payload) => {
-            console.log('Change received!', payload)
-            fetchMessages();
-            scrollToBottom();
-          }
+          handleRealtimeMessage
         )
         .subscribe()
 
@@ -224,7 +268,7 @@ export const useChat = (channelId?: string) => {
         await Promise.all(uploadPromises);
       }
 
-      await fetchMessages();
+      // Don't call fetchMessages here - let realtime handle the update
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -241,7 +285,7 @@ export const useChat = (channelId?: string) => {
         .single();
 
       if (error) throw error;
-      await fetchMessages();
+      // Realtime will handle the update
     } catch (error) {
       console.error('Error updating message:', error);
     }
@@ -255,7 +299,7 @@ export const useChat = (channelId?: string) => {
         .eq('id', messageId);
 
       if (error) throw error;
-      await fetchMessages();
+      // Realtime will handle the deletion
     } catch (error) {
       console.error('Error deleting message:', error);
     }
@@ -305,7 +349,7 @@ export const useChat = (channelId?: string) => {
         if (error) throw error;
       }
       
-      await fetchMessages();
+      // Don't refetch messages - realtime will handle updates
     } catch (error) {
       console.error('Error adding reaction:', error);
     }
