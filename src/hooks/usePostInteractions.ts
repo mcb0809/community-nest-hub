@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -102,18 +101,37 @@ export const usePostInteractions = (postId: string) => {
     if (!postId) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch comments first
+      const { data: commentsData, error } = await supabase
         .from('post_comments')
-        .select(`
-          *,
-          user_profiles!inner(display_name, avatar_url)
-        `)
+        .select('*')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
-      setComments(data || []);
+      // Fetch user profiles separately
+      const userIds = [...new Set((commentsData || []).map(comment => comment.user_id))];
+      const { data: userProfiles } = await supabase
+        .from('user_profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+
+      const userProfilesMap = new Map(
+        (userProfiles || []).map(profile => [profile.id, profile])
+      );
+
+      // Combine comments with user profiles
+      const commentsWithProfiles: PostComment[] = (commentsData || []).map(comment => ({
+        id: comment.id,
+        content: comment.content,
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        user_id: comment.user_id,
+        user_profiles: userProfilesMap.get(comment.user_id) || undefined
+      }));
+
+      setComments(commentsWithProfiles);
     } catch (error) {
       console.error('Error fetching comments:', error);
     }
