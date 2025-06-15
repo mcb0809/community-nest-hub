@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, User, Calendar, TrendingUp, Award, Target, Zap } from 'lucide-react';
+import { X, User, Calendar, TrendingUp, Award, Target, Zap, Flame, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,11 @@ interface UserStats {
   posts_count: number;
   courses_completed: number;
   streak_days: number;
+  current_streak: number | null;
+  longest_streak: number | null;
+  total_online_hours: number | null;
   last_activity: string | null;
+  last_login_date: string | null;
 }
 
 interface XPLog {
@@ -173,7 +177,7 @@ const UserDetailDrawer = ({ userId, isOpen, onClose }: UserDetailDrawerProps) =>
 
             {/* Stats Grid */}
             {userStats && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <Card className="bg-slate-800/50 border-slate-700">
                   <CardContent className="p-4 text-center">
                     <TrendingUp className="w-6 h-6 text-purple-400 mx-auto mb-2" />
@@ -200,9 +204,25 @@ const UserDetailDrawer = ({ userId, isOpen, onClose }: UserDetailDrawerProps) =>
                 
                 <Card className="bg-slate-800/50 border-slate-700">
                   <CardContent className="p-4 text-center">
-                    <Zap className="w-6 h-6 text-orange-400 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-white">{userStats.streak_days}</p>
-                    <p className="text-sm text-slate-400">Ngày streak</p>
+                    <Flame className="w-6 h-6 text-orange-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{userStats.current_streak || 0}</p>
+                    <p className="text-sm text-slate-400">Streak hiện tại</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-slate-800/50 border-slate-700">
+                  <CardContent className="p-4 text-center">
+                    <Zap className="w-6 h-6 text-red-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{userStats.longest_streak || 0}</p>
+                    <p className="text-sm text-slate-400">Streak cao nhất</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-slate-800/50 border-slate-700">
+                  <CardContent className="p-4 text-center">
+                    <Clock className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{userStats.total_online_hours?.toFixed(1) || '0'}</p>
+                    <p className="text-sm text-slate-400">Giờ online</p>
                   </CardContent>
                 </Card>
               </div>
@@ -231,7 +251,18 @@ const UserDetailDrawer = ({ userId, isOpen, onClose }: UserDetailDrawerProps) =>
                     {xpLogs.slice(0, 10).map((log) => (
                       <div key={log.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
                         <div>
-                          <p className="text-white font-medium">{log.action_type}</p>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">
+                              {log.action_type === 'daily_login' ? '📅' : 
+                               log.action_type === 'hourly_online' ? '⏰' :
+                               log.action_type === 'like' ? '👍' :
+                               log.action_type === 'comment' ? '💬' :
+                               log.action_type === 'share' ? '📤' :
+                               log.action_type === 'write_post' ? '✍️' :
+                               log.action_type === 'complete_course' ? '🎓' : '⚡'}
+                            </span>
+                            <p className="text-white font-medium capitalize">{log.action_type.replace('_', ' ')}</p>
+                          </div>
                           {log.description && (
                             <p className="text-sm text-slate-400">{log.description}</p>
                           )}

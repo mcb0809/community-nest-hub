@@ -91,6 +91,8 @@ const XPConfigForm = () => {
       { key: 'share', value: 300, description: 'XP earned for sharing a post' },
       { key: 'complete_course', value: 400, description: 'XP earned for completing a course' },
       { key: 'write_post', value: 350, description: 'XP earned for writing a post' },
+      { key: 'daily_login', value: 100, description: 'XP earned for daily login streak' },
+      { key: 'hourly_online', value: 20, description: 'XP earned per hour online' },
     ];
     setConfigs(defaultConfigs);
   };
@@ -102,8 +104,23 @@ const XPConfigForm = () => {
       'share': 'Chia sẻ',
       'complete_course': 'Hoàn thành khóa học',
       'write_post': 'Viết bài',
+      'daily_login': 'Đăng nhập hàng ngày',
+      'hourly_online': 'Mỗi giờ online',
     };
     return labels[key] || key;
+  };
+
+  const getActionIcon = (key: string) => {
+    const icons: Record<string, string> = {
+      'like': '👍',
+      'comment': '💬',
+      'share': '📤',
+      'complete_course': '🎓',
+      'write_post': '✍️',
+      'daily_login': '📅',
+      'hourly_online': '⏰',
+    };
+    return icons[key] || '⚡';
   };
 
   if (loading) {
@@ -144,36 +161,83 @@ const XPConfigForm = () => {
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {configs.map((config) => (
-          <div key={config.key} className="space-y-2">
-            <Label htmlFor={config.key} className="text-slate-300">
-              {getActionLabel(config.key)}
-            </Label>
-            <div className="flex items-center space-x-4">
-              <Input
-                id={config.key}
-                type="number"
-                value={config.value}
-                onChange={(e) => handleValueChange(config.key, e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white max-w-32"
-                placeholder="0"
-              />
-              <span className="text-purple-400 font-medium">XP</span>
-              {config.description && (
-                <span className="text-sm text-slate-400">{config.description}</span>
-              )}
+      <CardContent className="space-y-6">
+        {/* Basic Actions */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white border-b border-slate-600 pb-2">
+            Hoạt động cơ bản
+          </h3>
+          {configs.filter(config => ['like', 'comment', 'share', 'write_post', 'complete_course'].includes(config.key)).map((config) => (
+            <div key={config.key} className="space-y-2">
+              <Label htmlFor={config.key} className="text-slate-300 flex items-center space-x-2">
+                <span className="text-lg">{getActionIcon(config.key)}</span>
+                <span>{getActionLabel(config.key)}</span>
+              </Label>
+              <div className="flex items-center space-x-4">
+                <Input
+                  id={config.key}
+                  type="number"
+                  value={config.value}
+                  onChange={(e) => handleValueChange(config.key, e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white max-w-32"
+                  placeholder="0"
+                />
+                <span className="text-purple-400 font-medium">XP</span>
+                {config.description && (
+                  <span className="text-sm text-slate-400">{config.description}</span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Engagement & Time-based Actions */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white border-b border-slate-600 pb-2">
+            Tương tác & Thời gian
+          </h3>
+          {configs.filter(config => ['daily_login', 'hourly_online'].includes(config.key)).map((config) => (
+            <div key={config.key} className="space-y-2">
+              <Label htmlFor={config.key} className="text-slate-300 flex items-center space-x-2">
+                <span className="text-lg">{getActionIcon(config.key)}</span>
+                <span>{getActionLabel(config.key)}</span>
+              </Label>
+              <div className="flex items-center space-x-4">
+                <Input
+                  id={config.key}
+                  type="number"
+                  value={config.value}
+                  onChange={(e) => handleValueChange(config.key, e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white max-w-32"
+                  placeholder="0"
+                />
+                <span className="text-purple-400 font-medium">XP</span>
+                <span className="text-sm text-slate-400">
+                  {config.key === 'daily_login' ? '/ ngày streak' : '/ giờ'}
+                </span>
+                {config.description && (
+                  <span className="text-sm text-slate-400">- {config.description}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
         
-        <div className="mt-6 p-4 bg-slate-700/30 rounded-lg">
-          <p className="text-sm text-slate-400 mb-2">
-            <strong>Lưu ý:</strong> Thay đổi cấu hình XP sẽ áp dụng cho tất cả hoạt động mới. 
+        <div className="mt-6 p-4 bg-slate-700/30 rounded-lg space-y-3">
+          <p className="text-sm text-slate-400">
+            <strong>📅 Streak hàng ngày:</strong> User nhận XP khi đăng nhập liên tiếp mỗi ngày. 
+            Streak sẽ reset nếu bỏ lỡ 1 ngày.
+          </p>
+          <p className="text-sm text-slate-400">
+            <strong>⏰ Thời gian online:</strong> XP được tích lũy dựa trên số giờ user active trên website. 
+            Hệ thống tự động theo dõi và cập nhật.
+          </p>
+          <p className="text-sm text-slate-400">
+            <strong>🔄 Cập nhật:</strong> Thay đổi cấu hình XP sẽ áp dụng cho tất cả hoạt động mới. 
             Điểm XP đã tích lũy trước đó sẽ không bị ảnh hưởng.
           </p>
           <p className="text-xs text-slate-500">
-            Hệ thống sẽ tự động tính toán level dựa trên tổng XP theo công thức: Level = ⌊√(XP/100)⌋ + 1
+            Level = ⌊√(Total XP/100)⌋ + 1
           </p>
         </div>
       </CardContent>

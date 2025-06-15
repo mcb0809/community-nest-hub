@@ -640,11 +640,15 @@ export type Database = {
         Row: {
           courses_completed: number
           created_at: string
+          current_streak: number | null
           id: string
           last_activity: string | null
+          last_login_date: string | null
           level: number
+          longest_streak: number | null
           posts_count: number
           streak_days: number
+          total_online_hours: number | null
           total_xp: number
           updated_at: string
           user_id: string | null
@@ -652,11 +656,15 @@ export type Database = {
         Insert: {
           courses_completed?: number
           created_at?: string
+          current_streak?: number | null
           id?: string
           last_activity?: string | null
+          last_login_date?: string | null
           level?: number
+          longest_streak?: number | null
           posts_count?: number
           streak_days?: number
+          total_online_hours?: number | null
           total_xp?: number
           updated_at?: string
           user_id?: string | null
@@ -664,11 +672,15 @@ export type Database = {
         Update: {
           courses_completed?: number
           created_at?: string
+          current_streak?: number | null
           id?: string
           last_activity?: string | null
+          last_login_date?: string | null
           level?: number
+          longest_streak?: number | null
           posts_count?: number
           streak_days?: number
+          total_online_hours?: number | null
           total_xp?: number
           updated_at?: string
           user_id?: string | null
@@ -774,6 +786,14 @@ export type Database = {
       calculate_level: {
         Args: { total_xp: number }
         Returns: number
+      }
+      handle_daily_login: {
+        Args: { user_id_param: string }
+        Returns: Json
+      }
+      log_online_time: {
+        Args: { user_id_param: string; hours_online: number }
+        Returns: undefined
       }
     }
     Enums: {
