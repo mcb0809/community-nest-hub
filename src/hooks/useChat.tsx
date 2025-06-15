@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -38,14 +39,17 @@ export interface Channel {
 export const useChat = (channelId?: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const { user } = useAuth();
   const { logChatMessage } = useXPActions();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = async () => {
-    if (!channelId) return;
+    if (!channelId && !selectedChannel) return;
+    const targetChannelId = channelId || selectedChannel;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -55,11 +59,18 @@ export const useChat = (channelId?: string) => {
           user_profiles (display_name, avatar_url),
           message_attachments (*)
         `)
-        .eq('channel_id', channelId)
+        .eq('channel_id', targetChannelId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      // Transform the data to match our Message interface
+      const transformedMessages: Message[] = (data || []).map((msg: any) => ({
+        ...msg,
+        reactions: msg.reactions || {}
+      }));
+      
+      setMessages(transformedMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -77,6 +88,11 @@ export const useChat = (channelId?: string) => {
 
       if (error) throw error;
       setChannels(data || []);
+      
+      // Set first channel as selected if none selected
+      if (data && data.length > 0 && !selectedChannel) {
+        setSelectedChannel(data[0].id);
+      }
     } catch (error) {
       console.error('Error fetching channels:', error);
     } finally {
@@ -89,30 +105,37 @@ export const useChat = (channelId?: string) => {
   }
 
   useEffect(() => {
-    fetchMessages();
     fetchChannels();
+  }, []);
 
-    const messageChannel = supabase
-      .channel('public:messages')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
-        (payload) => {
-          console.log('Change received!', payload)
-          fetchMessages();
-          scrollToBottom();
-        }
-      )
-      .subscribe()
+  useEffect(() => {
+    if (selectedChannel || channelId) {
+      fetchMessages();
 
-    return () => {
-      supabase.removeChannel(messageChannel)
+      const targetChannelId = channelId || selectedChannel;
+      const messageChannel = supabase
+        .channel('public:messages')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'messages', filter: `channel_id=eq.${targetChannelId}` },
+          (payload) => {
+            console.log('Change received!', payload)
+            fetchMessages();
+            scrollToBottom();
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(messageChannel)
+      }
     }
-  }, [channelId]);
+  }, [channelId, selectedChannel]);
 
   const sendMessage = async (content: string, replyTo?: string, attachments?: File[]) => {
-    if (!user || !channelId || !content.trim()) return;
+    if (!user || (!channelId && !selectedChannel) || !content.trim()) return;
 
+    const targetChannelId = channelId || selectedChannel;
     setSending(true);
     try {
       // Send message
@@ -121,7 +144,7 @@ export const useChat = (channelId?: string) => {
         .insert([{
           content: content.trim(),
           user_id: user.id,
-          channel_id: channelId,
+          channel_id: targetChannelId,
           reply_to: replyTo || null
         }])
         .select()
@@ -224,29 +247,85 @@ export const useChat = (channelId?: string) => {
         });
       });
 
-      // Update the database
-      const { error } = await supabase.rpc('add_reaction', {
-        message_id: messageId,
-        reaction_type: reaction,
-        user_id: user.id
-      });
+      // Update the database - using custom SQL function instead of RPC
+      const targetMessage = messages.find(m => m.id === messageId);
+      if (targetMessage) {
+        const currentReactions = targetMessage.reactions || {};
+        const newReactions = { ...currentReactions };
+        
+        if (newReactions[reaction] && newReactions[reaction].includes(user.id)) {
+          newReactions[reaction] = newReactions[reaction].filter(userId => userId !== user.id);
+        } else {
+          newReactions[reaction] = [...(newReactions[reaction] || []), user.id];
+        }
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from('messages')
+          .update({ reactions: newReactions })
+          .eq('id', messageId);
+
+        if (error) throw error;
+      }
+      
       await fetchMessages();
     } catch (error) {
       console.error('Error adding reaction:', error);
     }
   };
 
+  const createChannel = async (name: string, description: string) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('channels')
+        .insert([{
+          name,
+          description,
+          created_by: user.id
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      await fetchChannels();
+      setSelectedChannel(data.id);
+    } catch (error) {
+      console.error('Error creating channel:', error);
+    }
+  };
+
+  const editChannel = async (channelId: string, name: string, description: string, icon: string) => {
+    try {
+      const { error } = await supabase
+        .from('channels')
+        .update({ name, description, icon })
+        .eq('id', channelId);
+
+      if (error) throw error;
+      await fetchChannels();
+    } catch (error) {
+      console.error('Error editing channel:', error);
+    }
+  };
+
+  const updateChannelReaction = addReaction; // Alias for compatibility
+
   return {
     messages,
     channels,
+    selectedChannel,
+    setSelectedChannel,
     loading,
     sending,
     sendMessage,
     updateMessage,
     deleteMessage,
     addReaction,
+    createChannel,
+    editChannel,
+    updateChannelReaction,
+    unreadCounts,
     messagesEndRef
   };
 };
