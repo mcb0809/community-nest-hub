@@ -20,14 +20,28 @@ interface PostEditorProps {
 
 const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) => {
   const [title, setTitle] = useState(post?.title || '');
-  const [content, setContent] = useState(post?.content || '');
+  const [content, setContent] = useState(() => {
+    if (!post?.content) return '';
+    // Remove YouTube markers from content for editing
+    return post.content.replace(/\[YOUTUBE:[a-zA-Z0-9_-]{11}\]/g, '').trim();
+  });
   const [tags, setTags] = useState<string[]>(post?.tags || []);
   const [visibility, setVisibility] = useState<'public' | 'vip' | 'draft'>(post?.visibility || 'public');
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [youtubeUrls, setYoutubeUrls] = useState<string[]>([]);
+  const [youtubeUrls, setYoutubeUrls] = useState<string[]>(() => {
+    if (!post?.content) return [];
+    // Extract existing YouTube URLs from content
+    const regex = /\[YOUTUBE:([a-zA-Z0-9_-]{11})\]/g;
+    const matches = [];
+    let match;
+    while ((match = regex.exec(post.content)) !== null) {
+      matches.push(`https://www.youtube.com/watch?v=${match[1]}`);
+    }
+    return matches;
+  });
   const [currentYoutubeUrl, setCurrentYoutubeUrl] = useState('');
   
-  const { createPost, updatePost } = usePosts();
+  const { createPost, updatePost, uploadAttachment } = usePosts();
 
   const extractYouTubeId = (url: string) => {
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
@@ -56,9 +70,9 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
       if (youtubeUrls.length > 0) {
         const youtubeEmbeds = youtubeUrls.map(url => {
           const videoId = extractYouTubeId(url);
-          return `\n\n[YOUTUBE:${videoId}]`;
-        }).join('');
-        finalContent += youtubeEmbeds;
+          return `[YOUTUBE:${videoId}]`;
+        }).join('\n');
+        finalContent = finalContent + '\n' + youtubeEmbeds;
       }
 
       const postData = {
@@ -77,7 +91,13 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
 
       // Upload attachments if any
       if (attachments.length > 0 && result) {
-        // Handle attachment uploads here if needed
+        for (const file of attachments) {
+          await uploadAttachment(result.id, file, 'file');
+        }
+        // Refresh the post data to include attachments
+        if (post) {
+          result = await updatePost(result.id, postData);
+        }
       }
 
       onSubmit?.(result);
@@ -87,19 +107,39 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
   };
 
   const handleSaveDraft = async () => {
+    let finalContent = content;
+    
+    // Add YouTube embeds to content for draft too
+    if (youtubeUrls.length > 0) {
+      const youtubeEmbeds = youtubeUrls.map(url => {
+        const videoId = extractYouTubeId(url);
+        return `[YOUTUBE:${videoId}]`;
+      }).join('\n');
+      finalContent = finalContent + '\n' + youtubeEmbeds;
+    }
+
     const draftData = {
       title: title || 'Untitled Draft',
-      content,
+      content: finalContent,
       tags,
       visibility: 'draft' as const
     };
 
     try {
+      let result;
       if (post) {
-        await updatePost(post.id, draftData);
+        result = await updatePost(post.id, draftData);
       } else {
-        await createPost(draftData);
+        result = await createPost(draftData);
       }
+
+      // Upload attachments for draft too
+      if (attachments.length > 0 && result) {
+        for (const file of attachments) {
+          await uploadAttachment(result.id, file, 'file');
+        }
+      }
+
       onCancel?.();
     } catch (error) {
       console.error('Error saving draft:', error);
@@ -111,9 +151,9 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full max-w-4xl mx-auto glass-card border border-slate-700/50">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-white">
           <Eye className="w-5 h-5" />
           {post ? 'Chỉnh sửa bài viết' : 'Tạo bài viết mới'}
         </CardTitle>
@@ -122,34 +162,34 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium mb-2">Tiêu đề bài viết</label>
+            <label className="block text-sm font-medium mb-2 text-slate-300">Tiêu đề bài viết</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Nhập tiêu đề hấp dẫn cho bài viết..."
               required
-              className="text-lg font-medium"
+              className="text-lg font-medium bg-slate-800/50 border-slate-600 text-white placeholder-slate-400"
             />
           </div>
 
           {/* Content */}
           <div>
-            <label className="block text-sm font-medium mb-2">Nội dung bài viết</label>
+            <label className="block text-sm font-medium mb-2 text-slate-300">Nội dung bài viết</label>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Viết nội dung chi tiết cho bài viết của bạn... Bạn có thể sử dụng Markdown để định dạng text."
               rows={10}
-              className="resize-none min-h-[200px]"
+              className="resize-none min-h-[200px] bg-slate-800/50 border-slate-600 text-white placeholder-slate-400"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Hỗ trợ Markdown: **bold**, *italic*, `code`, [link](url)
             </p>
           </div>
 
           {/* YouTube Videos */}
           <div>
-            <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+            <label className="block text-sm font-medium mb-2 flex items-center gap-2 text-slate-300">
               <Youtube className="w-4 h-4 text-red-500" />
               Video YouTube
             </label>
@@ -159,13 +199,14 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
                   value={currentYoutubeUrl}
                   onChange={(e) => setCurrentYoutubeUrl(e.target.value)}
                   placeholder="Dán link YouTube vào đây (ví dụ: https://www.youtube.com/watch?v=...)"
-                  className="flex-1"
+                  className="flex-1 bg-slate-800/50 border-slate-600 text-white placeholder-slate-400"
                 />
                 <Button
                   type="button"
                   onClick={addYouTubeUrl}
                   disabled={!currentYoutubeUrl.trim() || !extractYouTubeId(currentYoutubeUrl)}
                   variant="outline"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Thêm
@@ -174,25 +215,25 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
               
               {youtubeUrls.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="text-sm font-medium">Video đã thêm:</h4>
+                  <h4 className="text-sm font-medium text-slate-300">Video đã thêm:</h4>
                   {youtubeUrls.map((url, index) => {
                     const videoId = extractYouTubeId(url);
                     return (
-                      <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                      <div key={index} className="border rounded-lg p-3 bg-slate-800/30 border-slate-600">
                         <div className="flex justify-between items-start mb-2">
-                          <p className="text-sm text-gray-600 break-all">{url}</p>
+                          <p className="text-sm text-slate-400 break-all">{url}</p>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => removeYouTubeUrl(index)}
-                            className="text-red-500 hover:text-red-700 ml-2"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 ml-2"
                           >
                             <X className="w-4 h-4" />
                           </Button>
                         </div>
                         {videoId && (
-                          <div className="aspect-video bg-black rounded overflow-hidden">
+                          <div className="aspect-video bg-slate-900 rounded overflow-hidden">
                             <iframe
                               src={`https://www.youtube.com/embed/${videoId}`}
                               className="w-full h-full"
@@ -212,7 +253,7 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
 
           {/* Tags */}
           <div>
-            <label className="block text-sm font-medium mb-2">Tags (từ khóa)</label>
+            <label className="block text-sm font-medium mb-2 text-slate-300">Tags (từ khóa)</label>
             <TagSelector
               selectedTags={tags}
               onTagsChange={setTags}
@@ -222,12 +263,12 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
 
           {/* Visibility */}
           <div>
-            <label className="block text-sm font-medium mb-2">Quyền xem bài viết</label>
+            <label className="block text-sm font-medium mb-2 text-slate-300">Quyền xem bài viết</label>
             <Select value={visibility} onValueChange={(value: 'public' | 'vip' | 'draft') => setVisibility(value)}>
-              <SelectTrigger>
+              <SelectTrigger className="bg-slate-800/50 border-slate-600 text-white">
                 <SelectValue placeholder="Chọn quyền xem" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-slate-800 border-slate-600">
                 <SelectItem value="public">🌍 Công khai - Ai cũng có thể xem</SelectItem>
                 <SelectItem value="vip">👑 VIP Only - Chỉ thành viên VIP</SelectItem>
                 <SelectItem value="draft">📝 Bản nháp - Chỉ mình tôi xem</SelectItem>
@@ -237,7 +278,7 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
 
           {/* Attachments */}
           <div>
-            <label className="block text-sm font-medium mb-2">Đính kèm file & hình ảnh</label>
+            <label className="block text-sm font-medium mb-2 text-slate-300">Đính kèm file & hình ảnh</label>
             <AttachmentUploader
               onFilesChange={setAttachments}
               maxFiles={5}
@@ -245,13 +286,14 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-between pt-6 border-t">
+          <div className="flex justify-between pt-6 border-t border-slate-700">
             <div className="flex gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleSaveDraft}
                 disabled={isLoading}
+                className="border-slate-600 text-slate-300 hover:bg-slate-700"
               >
                 📝 Lưu nháp
               </Button>
@@ -260,6 +302,7 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
                 variant="outline"
                 onClick={onCancel}
                 disabled={isLoading}
+                className="border-slate-600 text-slate-300 hover:bg-slate-700"
               >
                 Hủy
               </Button>
@@ -267,7 +310,7 @@ const PostEditor = ({ post, onSubmit, onCancel, isLoading }: PostEditorProps) =>
             <Button
               type="submit"
               disabled={isLoading || !title.trim()}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+              className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white"
             >
               {isLoading ? 'Đang xử lý...' : (post ? '✏️ Cập nhật bài viết' : '🚀 Đăng bài viết')}
             </Button>

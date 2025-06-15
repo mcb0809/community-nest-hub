@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -145,7 +146,7 @@ export const usePosts = () => {
         user_profiles: userProfile
       };
       
-      setPosts(prev => [transformedPost, ...prev]);
+      await fetchPosts(); // Refresh posts list
       return transformedPost;
     } catch (error) {
       console.error('Error creating post:', error);
@@ -162,6 +163,7 @@ export const usePosts = () => {
           content: postData.content,
           tags: postData.tags,
           visibility: postData.visibility,
+          is_pinned: postData.is_pinned,
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
@@ -208,7 +210,7 @@ export const usePosts = () => {
         user_profiles: userProfile
       };
       
-      setPosts(prev => prev.map(post => post.id === id ? transformedPost : post));
+      await fetchPosts(); // Refresh posts list
       return transformedPost;
     } catch (error) {
       console.error('Error updating post:', error);
@@ -246,7 +248,7 @@ export const usePosts = () => {
 
       if (error) throw error;
       
-      setPosts(prev => prev.filter(post => post.id !== id));
+      await fetchPosts(); // Refresh posts list
     } catch (error) {
       console.error('Error deleting post:', error);
       throw error;
