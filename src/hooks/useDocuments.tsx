@@ -33,7 +33,15 @@ export const useDocuments = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDocuments(data || []);
+      
+      // Type the response data properly
+      const typedData = (data || []).map(doc => ({
+        ...doc,
+        access_level: doc.access_level as 'free' | 'vip',
+        tags: doc.tags || []
+      })) as Document[];
+      
+      setDocuments(typedData);
     } catch (error) {
       console.error('Error fetching documents:', error);
     } finally {
@@ -55,8 +63,15 @@ export const useDocuments = () => {
 
       if (error) throw error;
       
-      setDocuments(prev => [data, ...prev]);
-      return data;
+      // Type the response data properly
+      const typedData = {
+        ...data,
+        access_level: data.access_level as 'free' | 'vip',
+        tags: data.tags || []
+      } as Document;
+      
+      setDocuments(prev => [typedData, ...prev]);
+      return typedData;
     } catch (error) {
       console.error('Error creating document:', error);
       throw error;
@@ -77,8 +92,15 @@ export const useDocuments = () => {
 
       if (error) throw error;
       
-      setDocuments(prev => prev.map(doc => doc.id === id ? data : doc));
-      return data;
+      // Type the response data properly
+      const typedData = {
+        ...data,
+        access_level: data.access_level as 'free' | 'vip',
+        tags: data.tags || []
+      } as Document;
+      
+      setDocuments(prev => prev.map(doc => doc.id === id ? typedData : doc));
+      return typedData;
     } catch (error) {
       console.error('Error updating document:', error);
       throw error;
