@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -42,10 +41,6 @@ export const usePosts = () => {
         .from('posts')
         .select(`
           *,
-          user_profiles (
-            display_name,
-            avatar_url
-          ),
           post_attachments (*)
         `)
         .order('is_pinned', { ascending: false })
@@ -67,6 +62,17 @@ export const usePosts = () => {
 
       if (error) throw error;
       
+      // Fetch user profiles separately to avoid relationship issues
+      const userIds = [...new Set((data || []).map(post => post.user_id).filter(Boolean))];
+      const { data: userProfiles } = await supabase
+        .from('user_profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+
+      const userProfilesMap = new Map(
+        (userProfiles || []).map(profile => [profile.id, profile])
+      );
+      
       const transformedPosts: Post[] = (data || []).map(post => ({
         id: post.id,
         title: post.title,
@@ -86,7 +92,7 @@ export const usePosts = () => {
           meta: att.meta,
           uploaded_at: att.uploaded_at
         })),
-        user_profiles: post.user_profiles || null
+        user_profiles: post.user_id ? userProfilesMap.get(post.user_id) || null : null
       }));
       
       setPosts(transformedPosts);
@@ -109,16 +115,21 @@ export const usePosts = () => {
           user_id: user?.id,
           is_pinned: false
         }])
-        .select(`
-          *,
-          user_profiles (
-            display_name,
-            avatar_url
-          )
-        `)
+        .select()
         .single();
 
       if (error) throw error;
+      
+      // Fetch user profile separately
+      let userProfile = null;
+      if (data.user_id) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('display_name, avatar_url')
+          .eq('id', data.user_id)
+          .single();
+        userProfile = profile;
+      }
       
       const transformedPost: Post = {
         id: data.id,
@@ -131,7 +142,7 @@ export const usePosts = () => {
         created_at: data.created_at,
         updated_at: data.updated_at,
         attachments: [],
-        user_profiles: data.user_profiles || null
+        user_profiles: userProfile
       };
       
       setPosts(prev => [transformedPost, ...prev]);
@@ -154,17 +165,26 @@ export const usePosts = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .select(`
-          *,
-          user_profiles (
-            display_name,
-            avatar_url
-          ),
-          post_attachments (*)
-        `)
+        .select()
         .single();
 
       if (error) throw error;
+      
+      // Fetch user profile and attachments separately
+      let userProfile = null;
+      if (data.user_id) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('display_name, avatar_url')
+          .eq('id', data.user_id)
+          .single();
+        userProfile = profile;
+      }
+
+      const { data: attachments } = await supabase
+        .from('post_attachments')
+        .select('*')
+        .eq('post_id', id);
       
       const transformedPost: Post = {
         id: data.id,
@@ -176,7 +196,7 @@ export const usePosts = () => {
         is_pinned: data.is_pinned || false,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        attachments: (data.post_attachments || []).map((att: any) => ({
+        attachments: (attachments || []).map((att: any) => ({
           id: att.id,
           post_id: att.post_id,
           type: att.type,
@@ -185,7 +205,7 @@ export const usePosts = () => {
           meta: att.meta,
           uploaded_at: att.uploaded_at
         })),
-        user_profiles: data.user_profiles || null
+        user_profiles: userProfile
       };
       
       setPosts(prev => prev.map(post => post.id === id ? transformedPost : post));
