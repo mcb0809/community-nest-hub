@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -33,39 +32,58 @@ const sendEventWebhook = async (event: Event) => {
     const webhookUrl = 'https://mcbaivn.tino.page/webhook/eventcreate';
     const credentials = btoa('MCBAIVN:Machbang8920!');
     
+    // Create event link (assuming you have a frontend URL structure)
+    const eventLink = `${window.location.origin}/events/${event.id}`;
+    
+    const payload = {
+      event_id: event.id,
+      event_name: (event.title || '').trim(),
+      event_time: `${event.date} ${event.time}`.trim(),
+      event_link: eventLink,
+      event_type: (event.type || '').trim(),
+      event_status: (event.status || '').trim(),
+      event_format: (event.format || '').trim(),
+      duration: event.duration,
+      description: (event.description || '').trim(),
+      max_attendees: event.max_attendees,
+      instructor: (event.instructor || '').trim(),
+      location: event.format === 'offline' ? (event.location || '').trim() : null,
+      meeting_link: event.format === 'online' ? (event.meeting_link || '').trim() : null,
+      tags: event.tags || [],
+      created_at: event.created_at,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log('Event creation payload to send:', JSON.stringify(payload, null, 2));
+
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${credentials}`
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Basic ${credentials}`,
+        'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        event_id: event.id,
-        title: event.title,
-        description: event.description,
-        type: event.type,
-        format: event.format,
-        date: event.date,
-        time: event.time,
-        duration: event.duration,
-        instructor: event.instructor,
-        location: event.location,
-        meeting_link: event.meeting_link,
-        max_attendees: event.max_attendees,
-        status: event.status,
-        tags: event.tags,
-        created_at: event.created_at,
-        timestamp: new Date().toISOString()
-      })
+      body: JSON.stringify(payload)
     });
 
+    console.log('Event creation response status:', response.status);
+
     if (response.ok) {
-      console.log('Webhook sent successfully');
+      console.log('✅ Event creation webhook sent successfully');
+      const responseData = await response.text();
+      console.log('Event creation response data:', responseData);
     } else {
-      console.error('Webhook failed with status:', response.status);
+      console.error('❌ Event creation webhook failed with status:', response.status);
+      const errorText = await response.text();
+      console.error('Event creation error response:', errorText);
     }
   } catch (error) {
-    console.error('Error sending webhook:', error);
+    console.error('❌ Error sending event creation webhook:', error);
+    console.error('Event creation error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
   }
 };
 
@@ -190,7 +208,7 @@ export const useEvents = () => {
 
       setEvents(prev => [...prev, transformedData]);
       
-      // Send webhook after successful creation
+      // Send webhook after successful creation with full event details
       await sendEventWebhook(transformedData);
       
       toast({
