@@ -47,14 +47,32 @@ export const useChat = () => {
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select('*, user_profiles:user_id(display_name, avatar_url, role), reply_message:reply_to(*, user_profiles(display_name))')
+        .select(`
+          *, 
+          user_profiles!messages_user_id_fkey(display_name, avatar_url, role), 
+          reply_message:reply_to(*, user_profiles!messages_user_id_fkey(display_name))
+        `)
         .eq('channel_id', selectedChannel)
         .order('created_at', { ascending: true });
 
       if (error) {
         setError(error.message);
       } else {
-        setMessages(data || []);
+        // Transform the data to match our Message type
+        const transformedMessages: Message[] = (data || []).map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          channel_id: msg.channel_id,
+          user_id: msg.user_id,
+          created_at: msg.created_at,
+          updated_at: msg.updated_at,
+          reactions: msg.reactions || {},
+          reply_to: msg.reply_to,
+          user_profiles: msg.user_profiles,
+          reply_message: msg.reply_message,
+          attachments: msg.attachments || []
+        }));
+        setMessages(transformedMessages);
       }
     } catch (err: any) {
       setError(err.message);
@@ -208,7 +226,7 @@ export const useChat = () => {
         // Optimistically update the local state
         setMessages(prevMessages =>
           prevMessages.map(msg =>
-            msg.id === messageId ? { ...msg, reactions } : msg
+            msg.id === messageId ? { ...msg, reactions: reactions as Record<string, string[]> } : msg
           )
         );
       }

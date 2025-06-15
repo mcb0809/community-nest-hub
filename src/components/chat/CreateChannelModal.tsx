@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 
 interface CreateChannelModalProps {
-  onCreateChannel: (name: string, description: string) => void;
+  onCreateChannel: (name: string, description: string, icon: string) => void;
 }
 
 const CreateChannelModal = ({ onCreateChannel }: CreateChannelModalProps) => {
@@ -25,7 +25,7 @@ const CreateChannelModal = ({ onCreateChannel }: CreateChannelModalProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onCreateChannel(name.trim(), description.trim());
+      onCreateChannel(name.trim(), description.trim(), 'Hash');
       setName('');
       setDescription('');
       setOpen(false);
