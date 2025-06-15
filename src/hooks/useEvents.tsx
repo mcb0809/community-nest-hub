@@ -68,12 +68,13 @@ const sendEventWebhook = async (event: Event) => {
   }
 };
 
-const sendRegistrationWebhook = async (event: Event, userName: string, userId: string) => {
+const sendRegistrationWebhook = async (event: Event, userName: string, userId: string, userEmail: string | null) => {
   try {
     console.log('=== STARTING REGISTRATION WEBHOOK ===');
     console.log('Event ID:', event.id);
     console.log('User Name:', userName);
     console.log('User ID:', userId);
+    console.log('User Email:', userEmail);
     console.log('Event Title:', event.title);
     
     const webhookUrl = 'https://mcbaivn.tino.page/webhook/eventjoint';
@@ -89,6 +90,7 @@ const sendRegistrationWebhook = async (event: Event, userName: string, userId: s
       event_time: event.time,
       user_id: userId,
       user_name: userName,
+      user_email: userEmail,
       registered_at: new Date().toISOString(),
       timestamp: new Date().toISOString()
     };
@@ -105,8 +107,7 @@ const sendRegistrationWebhook = async (event: Event, userName: string, userId: s
       body: JSON.stringify(payload)
     });
 
-    // With no-cors mode, we won't get a proper response status
-    // But the request will be sent without CORS blocking it
+    // Với chế độ no-cors sẽ không kiểm tra được response status
     console.log('✅ Registration webhook request sent (no-cors mode)');
     console.log('Note: Response status cannot be checked due to no-cors mode');
     
@@ -277,6 +278,7 @@ export const useEvents = () => {
       }
 
       console.log('Authenticated User ID:', user.id);
+      console.log('Authenticated User Email:', user.email);
 
       // First, add registration with user_id
       const { error: registrationError } = await supabase
@@ -306,8 +308,8 @@ export const useEvents = () => {
 
         console.log('✅ Event updated, now sending registration webhook...');
         
-        // Send registration webhook after successful registration
-        await sendRegistrationWebhook(event, userName, user.id);
+        // Send registration webhook after successful registration, truyền thêm email vào đây
+        await sendRegistrationWebhook(event, userName, user.id, user.email ?? null);
       } else {
         console.error('❌ Event not found in local state for webhook');
       }
