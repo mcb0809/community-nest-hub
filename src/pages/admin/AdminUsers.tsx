@@ -133,6 +133,24 @@ const AdminUsers = () => {
 
   const { users: leaderboardUsers } = useLeaderboardRealtime();
 
+  // For leaderboard tab, map missing fields for MemberCard
+  const leaderboardData = leaderboardUsers.map((u, i) => ({
+    ...u,
+    rank: i + 1,
+    totalPoints: u.xp, // fallback: show XP as totalPoints
+    maxXp: (() => {
+      const thresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
+      let acc = 0;
+      for (let th = 0; th < thresholds.length; th++) {
+        acc += thresholds[th];
+        if (u.xp < acc) {
+          return acc;
+        }
+      }
+      return acc;
+    })(),
+  }));
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -391,7 +409,7 @@ const AdminUsers = () => {
         <TabsContent value="leaderboard" className="space-y-8">
           <LeaderboardHeader />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {leaderboardUsers.map((member, index) => (
+            {leaderboardData.map((member, index) => (
               <MemberCard key={member.id} member={member} index={index} />
             ))}
           </div>

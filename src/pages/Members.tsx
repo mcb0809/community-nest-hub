@@ -190,11 +190,30 @@ const Members = () => {
   // Thay vì getLeaderboardData(), dùng dữ liệu realtime
   const { users: members, loading } = useLeaderboardRealtime();
 
+  // Assign rank, totalPoints, maxXp for rendering MemberCard
+  const membersWithStats = members.map((member, i) => ({
+    ...member,
+    rank: i + 1,
+    totalPoints: member.xp, // fallback: show XP as totalPoints, update if needed!
+    maxXp: (() => {
+      // replicate levelThresholds logic
+      const thresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
+      let acc = 0, level = 1;
+      for (let th = 0; th < thresholds.length; th++) {
+        acc += thresholds[th];
+        if (member.xp < acc) {
+          return acc;
+        }
+      }
+      return acc; // if above highest
+    })(),
+  }));
+
   // Bổ sung lọc theo Level
-  const filteredMembers = members.filter(member => {
+  const filteredMembers = membersWithStats.filter(member => {
     const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
-      (filterType === 'top10' && members.indexOf(member) < 10) ||
+      (filterType === 'top10' && membersWithStats.indexOf(member) < 10) ||
       (filterType === 'online' && member.isOnline) ||
       (filterType === 'streak' && member.streak >= 7);
     const matchesLevel = levelFilter ? member.level === levelFilter : true;
