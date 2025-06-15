@@ -2,23 +2,19 @@
 import React, { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Upload, FileText, Image, X, Link } from 'lucide-react';
+import { Upload, FileText, Image, X } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 
 interface AttachmentUploaderProps {
   onFilesChange: (files: File[]) => void;
   maxFiles?: number;
-  acceptedTypes?: string[];
 }
 
 const AttachmentUploader = ({ 
   onFilesChange, 
-  maxFiles = 10,
-  acceptedTypes = ['image/*', 'application/pdf', '.doc', '.docx', '.txt', '.zip', '.rar']
+  maxFiles = 10
 }: AttachmentUploaderProps) => {
   const [files, setFiles] = useState<File[]>([]);
-  const [dragActive, setDragActive] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = [...files, ...acceptedFiles].slice(0, maxFiles);
@@ -29,10 +25,15 @@ const AttachmentUploader = ({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     maxFiles: maxFiles - files.length,
-    accept: acceptedTypes.reduce((acc, type) => {
-      acc[type] = [];
-      return acc;
-    }, {} as Record<string, string[]>)
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/plain': ['.txt'],
+      'application/zip': ['.zip'],
+      'application/x-rar-compressed': ['.rar']
+    }
   });
 
   const removeFile = (indexToRemove: number) => {
@@ -110,22 +111,6 @@ const AttachmentUploader = ({
           ))}
         </div>
       )}
-
-      {/* Quick Actions */}
-      <div className="flex gap-2 text-xs">
-        <Button variant="outline" size="sm" className="flex items-center gap-1">
-          <Image className="w-3 h-3" />
-          Thêm ảnh
-        </Button>
-        <Button variant="outline" size="sm" className="flex items-center gap-1">
-          <FileText className="w-3 h-3" />
-          Thêm file
-        </Button>
-        <Button variant="outline" size="sm" className="flex items-center gap-1">
-          <Link className="w-3 h-3" />
-          Thêm link
-        </Button>
-      </div>
     </div>
   );
 };

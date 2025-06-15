@@ -1,12 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Check, ChevronsUpDown, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { X, Plus } from 'lucide-react';
 
 interface TagSelectorProps {
   selectedTags: string[];
@@ -21,23 +18,17 @@ const SUGGESTED_TAGS = [
   'News', 'Review', 'Tips & Tricks', 'Best Practices'
 ];
 
-const TagSelector = ({ selectedTags, onTagsChange, placeholder = "Chọn hoặc tạo tag..." }: TagSelectorProps) => {
-  const [open, setOpen] = useState(false);
+const TagSelector = ({ selectedTags, onTagsChange, placeholder = "Thêm tag..." }: TagSelectorProps) => {
   const [inputValue, setInputValue] = useState('');
-  const [availableTags, setAvailableTags] = useState<string[]>(SUGGESTED_TAGS);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const addTag = (tag: string) => {
     const trimmedTag = tag.trim();
     if (trimmedTag && !selectedTags.includes(trimmedTag)) {
       onTagsChange([...selectedTags, trimmedTag]);
-      
-      // Add to available tags if it's a new one
-      if (!availableTags.includes(trimmedTag)) {
-        setAvailableTags([...availableTags, trimmedTag]);
-      }
     }
     setInputValue('');
-    setOpen(false);
+    setShowSuggestions(false);
   };
 
   const removeTag = (tagToRemove: string) => {
@@ -51,75 +42,66 @@ const TagSelector = ({ selectedTags, onTagsChange, placeholder = "Chọn hoặc 
     }
   };
 
-  const filteredTags = availableTags.filter(tag => 
+  const filteredTags = SUGGESTED_TAGS.filter(tag => 
     !selectedTags.includes(tag) && 
     tag.toLowerCase().includes(inputValue.toLowerCase())
   );
 
   return (
     <div className="space-y-2">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between"
-          >
-            {placeholder}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-full p-0">
-          <Command>
-            <CommandInput
-              placeholder="Tìm kiếm hoặc tạo tag mới..."
-              value={inputValue}
-              onValueChange={setInputValue}
-              onKeyDown={handleKeyDown}
-            />
-            <CommandEmpty>
-              {inputValue.trim() && (
-                <div
-                  className="flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-muted"
-                  onClick={() => addTag(inputValue)}
-                >
-                  <Plus className="w-4 h-4" />
-                  Tạo tag "{inputValue}"
-                </div>
-              )}
-            </CommandEmpty>
-            <CommandGroup>
-              {filteredTags.map((tag) => (
-                <CommandItem
-                  key={tag}
-                  value={tag}
-                  onSelect={() => addTag(tag)}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedTags.includes(tag) ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {tag}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <div className="relative">
+        <Input
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          placeholder={placeholder}
+        />
+        
+        {showSuggestions && inputValue && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+            {inputValue.trim() && (
+              <div
+                className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50"
+                onClick={() => addTag(inputValue)}
+              >
+                <Plus className="w-4 h-4" />
+                Tạo tag "{inputValue}"
+              </div>
+            )}
+            {filteredTags.map((tag) => (
+              <div
+                key={tag}
+                className="px-3 py-2 cursor-pointer hover:bg-gray-50"
+                onClick={() => addTag(tag)}
+              >
+                {tag}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {selectedTags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-2">
           {selectedTags.map((tag) => (
             <Badge
               key={tag}
               variant="secondary"
-              className="cursor-pointer hover:bg-red-100 hover:text-red-700"
-              onClick={() => removeTag(tag)}
+              className="flex items-center gap-1"
             >
-              {tag} ×
+              {tag}
+              <button
+                type="button"
+                onClick={() => removeTag(tag)}
+                className="hover:text-red-500"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </Badge>
           ))}
         </div>

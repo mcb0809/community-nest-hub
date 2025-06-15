@@ -42,7 +42,7 @@ export const usePosts = () => {
         .from('posts')
         .select(`
           *,
-          user_profiles!posts_user_id_fkey (
+          user_profiles (
             display_name,
             avatar_url
           ),
@@ -86,9 +86,7 @@ export const usePosts = () => {
           meta: att.meta,
           uploaded_at: att.uploaded_at
         })),
-        user_profiles: Array.isArray(post.user_profiles) && post.user_profiles.length > 0 
-          ? post.user_profiles[0] 
-          : post.user_profiles || null
+        user_profiles: post.user_profiles || null
       }));
       
       setPosts(transformedPosts);
@@ -113,7 +111,7 @@ export const usePosts = () => {
         }])
         .select(`
           *,
-          user_profiles!posts_user_id_fkey (
+          user_profiles (
             display_name,
             avatar_url
           )
@@ -133,9 +131,7 @@ export const usePosts = () => {
         created_at: data.created_at,
         updated_at: data.updated_at,
         attachments: [],
-        user_profiles: Array.isArray(data.user_profiles) && data.user_profiles.length > 0 
-          ? data.user_profiles[0] 
-          : data.user_profiles || null
+        user_profiles: data.user_profiles || null
       };
       
       setPosts(prev => [transformedPost, ...prev]);
@@ -160,7 +156,7 @@ export const usePosts = () => {
         .eq('id', id)
         .select(`
           *,
-          user_profiles!posts_user_id_fkey (
+          user_profiles (
             display_name,
             avatar_url
           ),
@@ -189,9 +185,7 @@ export const usePosts = () => {
           meta: att.meta,
           uploaded_at: att.uploaded_at
         })),
-        user_profiles: Array.isArray(data.user_profiles) && data.user_profiles.length > 0 
-          ? data.user_profiles[0] 
-          : data.user_profiles || null
+        user_profiles: data.user_profiles || null
       };
       
       setPosts(prev => prev.map(post => post.id === id ? transformedPost : post));
