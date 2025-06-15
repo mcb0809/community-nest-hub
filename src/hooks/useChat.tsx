@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -132,7 +131,9 @@ export const useChat = (channelId?: string) => {
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   }
 
   // Handle real-time message updates
@@ -164,13 +165,18 @@ export const useChat = (channelId?: string) => {
         message_attachments: attachments || []
       };
 
+      console.log('Adding new message to state:', newMessage);
+
       // Add new message to existing messages instead of refetching all
       setMessages(prev => {
         // Check if message already exists to avoid duplicates
         if (prev.some(msg => msg.id === newMessage.id)) {
+          console.log('Message already exists, skipping');
           return prev;
         }
-        return [...prev, newMessage];
+        const updated = [...prev, newMessage];
+        console.log('Updated messages count:', updated.length);
+        return updated;
       });
       
       scrollToBottom();
@@ -192,17 +198,22 @@ export const useChat = (channelId?: string) => {
       fetchMessages();
 
       const targetChannelId = channelId || selectedChannel;
+      console.log('Setting up realtime subscription for channel:', targetChannelId);
+      
       const messageChannel = supabase
-        .channel('public:messages')
+        .channel(`public:messages:${targetChannelId}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'messages', filter: `channel_id=eq.${targetChannelId}` },
           handleRealtimeMessage
         )
-        .subscribe()
+        .subscribe((status) => {
+          console.log('Subscription status:', status);
+        });
 
       return () => {
-        supabase.removeChannel(messageChannel)
+        console.log('Cleaning up realtime subscription');
+        supabase.removeChannel(messageChannel);
       }
     }
   }, [channelId, selectedChannel]);
@@ -213,6 +224,8 @@ export const useChat = (channelId?: string) => {
     const targetChannelId = channelId || selectedChannel;
     setSending(true);
     try {
+      console.log('Sending message to channel:', targetChannelId);
+      
       // Send message
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
@@ -227,9 +240,9 @@ export const useChat = (channelId?: string) => {
 
       if (messageError) throw messageError;
 
-      console.log('Message sent, logging XP for user:', user.id);
+      console.log('Message sent successfully:', messageData);
       
-      // Log XP for sending message - ensure this actually works
+      // Log XP for sending message
       try {
         const xpEarned = await logChatMessage(user.id, messageData.id);
         console.log('XP logged successfully:', xpEarned);
@@ -268,7 +281,7 @@ export const useChat = (channelId?: string) => {
         await Promise.all(uploadPromises);
       }
 
-      // Don't call fetchMessages here - let realtime handle the update
+      // The real-time subscription will handle adding the message to the UI
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
