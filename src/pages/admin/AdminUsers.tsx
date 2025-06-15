@@ -13,13 +13,29 @@ import { Users, Settings, BarChart3, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { recalculateUserStats } from '@/hooks/useLeaderboardRealtime';
 
+interface UserWithStats {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  email: string | null;
+  role: string;
+  created_at: string;
+  user_stats?: {
+    total_xp: number;
+    level: number;
+    posts_count: number;
+    courses_completed: number;
+    last_activity: string | null;
+  } | null;
+}
+
 const AdminUsers = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
   // Fetch users with stats
-  const { data: users = [], isLoading, refetch } = useQuery({
+  const { data: rawUsers = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -31,6 +47,23 @@ const AdminUsers = () => {
       return data || [];
     }
   });
+
+  // Transform the data to match UserWithStats interface
+  const users: UserWithStats[] = rawUsers.map((user: any) => ({
+    id: user.id,
+    display_name: user.name || 'Anonymous',
+    avatar_url: user.avatar,
+    email: user.email,
+    role: 'member', // Default role, could be enhanced later
+    created_at: user.joined_at,
+    user_stats: {
+      total_xp: user.total_xp || 0,
+      level: user.level || 1,
+      posts_count: user.posts_count || 0,
+      courses_completed: user.courses_completed || 0,
+      last_activity: user.last_activity,
+    }
+  }));
 
   // Handle manual refresh/recalculation
   const handleRefreshStats = async () => {
@@ -54,10 +87,10 @@ const AdminUsers = () => {
 
   // Calculate stats for the admin header
   const totalUsers = users.length;
-  const onlineUsers = users.filter(u => u.is_online).length;
+  const onlineUsers = rawUsers.filter((u: any) => u.is_online).length;
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
-  const newUsersThisWeek = users.filter(u => 
+  const newUsersThisWeek = rawUsers.filter((u: any) => 
     new Date(u.joined_at) > weekAgo
   ).length;
   const activePercentage = totalUsers > 0 
@@ -132,7 +165,14 @@ const AdminUsers = () => {
         </TabsContent>
 
         <TabsContent value="analytics">
-          <XPLogChart />
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white">XP Analytics Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-400">Select a user from the Users tab to view detailed XP analytics.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="settings">
@@ -143,6 +183,7 @@ const AdminUsers = () => {
       {selectedUserId && (
         <UserDetailDrawer
           userId={selectedUserId}
+          isOpen={true}
           onClose={() => setSelectedUserId(null)}
         />
       )}

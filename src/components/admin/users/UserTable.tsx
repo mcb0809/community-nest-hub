@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Eye, Clock, CheckCircle } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,10 +23,11 @@ interface UserWithStats {
 
 interface UserTableProps {
   users: UserWithStats[];
-  onViewDetails: (userId: string) => void;
+  isLoading: boolean;
+  onUserSelect: (userId: string) => void;
 }
 
-const UserTable = ({ users, onViewDetails }: UserTableProps) => {
+const UserTable = ({ users, isLoading, onUserSelect }: UserTableProps) => {
   const roleColors = {
     admin: 'bg-red-500/20 text-red-400',
     moderator: 'bg-yellow-500/20 text-yellow-400',
@@ -40,6 +41,14 @@ const UserTable = ({ users, onViewDetails }: UserTableProps) => {
     const diffMinutes = (now.getTime() - activity.getTime()) / (1000 * 60);
     return diffMinutes < 30; // Consider online if active within 30 minutes
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
 
   return (
     <Table>
@@ -137,7 +146,7 @@ const UserTable = ({ users, onViewDetails }: UserTableProps) => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onViewDetails(user.id)}
+                onClick={() => onUserSelect(user.id)}
                 className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
               >
                 <Eye className="w-4 h-4 mr-2" />
