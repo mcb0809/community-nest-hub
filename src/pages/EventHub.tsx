@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, Users, Video, Plus, Filter } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Video, Filter } from 'lucide-react';
 import { useEvents } from '@/hooks/useEvents';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -78,12 +77,6 @@ const EventHub = () => {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Event Hub</h1>
           <p className="text-slate-600 dark:text-slate-400">Join our community events and workshops</p>
         </div>
-        {userProfile?.role === 'admin' && (
-          <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Event
-          </Button>
-        )}
       </div>
 
       {/* View Toggle */}
