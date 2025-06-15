@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -88,26 +89,20 @@ const sendRegistrationWebhook = async (
     console.log('Webhook URL:', webhookUrl);
     console.log('Credentials generated successfully');
     
-    // Đảm bảo mọi trường đều là string (nếu null thì để "")
-    const safeString = (value: any) => (value !== null && value !== undefined ? String(value) : '');
-
     const payload = {
-      event_id: safeString(event.id),
-      event_title: safeString(event.title),
-      event_date: safeString(event.date),
-      event_time: safeString(event.time),
-      user_id: safeString(userId),
-      user_name: safeString(userName),
-      user_email: safeString(userEmail),
-      registered_at: new Date().toISOString(), // ISO string
-      timestamp: new Date().toISOString(), // ISO string
+      user_name: userName || '',
+      user_email: userEmail || '',
+      event_title: event.title || '',
+      event_time: `${event.date} ${event.time}` || '',
+      event_id: event.id || '',
+      user_id: userId || '',
+      registered_at: new Date().toISOString()
     };
     
     console.log('Payload to send:', JSON.stringify(payload, null, 2));
     
     const response = await fetch(webhookUrl, {
       method: 'POST',
-      mode: 'no-cors', // Add this to bypass CORS
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${credentials}`
@@ -115,9 +110,17 @@ const sendRegistrationWebhook = async (
       body: JSON.stringify(payload)
     });
 
-    // Với chế độ no-cors sẽ không kiểm tra được response status
-    console.log('✅ Registration webhook request sent (no-cors mode)');
-    console.log('Note: Response status cannot be checked due to no-cors mode');
+    console.log('Response status:', response.status);
+    
+    if (response.ok) {
+      console.log('✅ Registration webhook sent successfully');
+      const responseText = await response.text();
+      console.log('Response body:', responseText);
+    } else {
+      console.error('❌ Registration webhook failed with status:', response.status);
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+    }
     
   } catch (error) {
     console.error('❌ Error sending registration webhook:', error);
@@ -316,7 +319,7 @@ export const useEvents = () => {
 
         console.log('✅ Event updated, now sending registration webhook...');
         
-        // Send registration webhook after successful registration, truyền thêm email vào đây
+        // Send registration webhook after successful registration
         await sendRegistrationWebhook(event, userName, user.id, user.email ?? null);
       } else {
         console.error('❌ Event not found in local state for webhook');
