@@ -42,10 +42,12 @@ export const useEvents = () => {
       if (error) throw error;
       
       // Transform the data to ensure registered_users is properly typed
-      const transformedData = (data || []).map(event => ({
+      const transformedData: Event[] = (data || []).map(event => ({
         ...event,
-        registered_users: Array.isArray(event.registered_users) ? event.registered_users : [],
-        tags: Array.isArray(event.tags) ? event.tags : []
+        registered_users: Array.isArray(event.registered_users) ? 
+          event.registered_users.filter((user): user is string => typeof user === 'string') : [],
+        tags: Array.isArray(event.tags) ? 
+          event.tags.filter((tag): tag is string => typeof tag === 'string') : []
       }));
       
       setEvents(transformedData);
@@ -74,10 +76,12 @@ export const useEvents = () => {
 
       if (error) throw error;
 
-      const transformedData = {
+      const transformedData: Event = {
         ...data,
-        registered_users: Array.isArray(data.registered_users) ? data.registered_users : [],
-        tags: Array.isArray(data.tags) ? data.tags : []
+        registered_users: Array.isArray(data.registered_users) ? 
+          data.registered_users.filter((user): user is string => typeof user === 'string') : [],
+        tags: Array.isArray(data.tags) ? 
+          data.tags.filter((tag): tag is string => typeof tag === 'string') : []
       };
 
       setEvents(prev => [...prev, transformedData]);
@@ -111,10 +115,12 @@ export const useEvents = () => {
 
       if (error) throw error;
 
-      const transformedData = {
+      const transformedData: Event = {
         ...data,
-        registered_users: Array.isArray(data.registered_users) ? data.registered_users : [],
-        tags: Array.isArray(data.tags) ? data.tags : []
+        registered_users: Array.isArray(data.registered_users) ? 
+          data.registered_users.filter((user): user is string => typeof user === 'string') : [],
+        tags: Array.isArray(data.tags) ? 
+          data.tags.filter((tag): tag is string => typeof tag === 'string') : []
       };
 
       setEvents(prev => prev.map(event => event.id === id ? transformedData : event));
