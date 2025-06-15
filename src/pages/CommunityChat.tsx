@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Hash,
@@ -24,7 +23,7 @@ import { useMessageSearch } from '@/hooks/useMessageSearch';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 const CommunityChat = () => {
-  const { user, signOut, loading: authLoading, isAdmin } = useAuth();
+  const { user, signOut, loading: authLoading, isAdmin, userProfile } = useAuth();
   const { isAuthenticated, showAuthModal, requireAuth, closeAuthModal } = useAuthGuard();
   const {
     channels,
@@ -206,7 +205,7 @@ const CommunityChat = () => {
 
               {isAuthenticated && (
                 <>
-                  <span className="text-sm text-slate-300">{user?.email}</span>
+                  <span className="text-sm text-slate-300">{userProfile?.display_name || user?.email}</span>
                   <Button variant="ghost" size="sm" className="text-slate-400 hover:text-purple-400 hover:bg-purple-500/20">
                     <Bell className="w-4 h-4" />
                   </Button>
@@ -269,15 +268,15 @@ const CommunityChat = () => {
                   key={message.id}
                   message={isAuthenticated ? {
                     id: message.id,
-                    user: message.user_profiles?.display_name || message.user_profiles?.email || user?.email || 'Unknown User',
-                    avatar: message.user_profiles?.avatar_url || '/api/placeholder/32/32',
+                    user: message.user_profiles?.display_name || message.user_profiles?.email || userProfile?.display_name || user?.email || 'Unknown User',
+                    avatar: message.user_profiles?.avatar_url || userProfile?.avatar_url || '/api/placeholder/32/32',
                     message: message.content,
                     timestamp: new Date(message.created_at).toLocaleTimeString([],
                       {
                         hour: '2-digit',
                         minute: '2-digit'
                       }),
-                    role: (message.user_profiles?.role as 'admin' | 'mod' | 'user') || 'user',
+                    role: (message.user_profiles?.role || userProfile?.role || 'user') as 'admin' | 'mod' | 'user',
                     replyTo: message.reply_message ? {
                       user: message.reply_message.user_profiles?.display_name || 'Unknown User',
                       message: message.reply_message.content

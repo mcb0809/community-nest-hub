@@ -42,7 +42,7 @@ export const useChat = (channelId?: string) => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { logChatMessage } = useXPActions();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -238,8 +238,10 @@ export const useChat = (channelId?: string) => {
         reactions: {},
         reply_to: replyTo || null,
         user_profiles: {
-          display_name: user.email || 'Unknown User',
-          avatar_url: undefined
+          display_name: userProfile?.display_name || user.email || 'Unknown User',
+          avatar_url: userProfile?.avatar_url,
+          email: userProfile?.email || user.email,
+          role: userProfile?.role || 'user'
         },
         message_attachments: []
       };
