@@ -15,7 +15,7 @@ export interface LeaderboardUser {
   isOnline: boolean;
   joinDate: string;
   title?: string;
-  postsCount: number; // Added this field
+  postsCount: number;
 }
 
 export function useLeaderboardRealtime() {
@@ -25,41 +25,51 @@ export function useLeaderboardRealtime() {
   async function fetchLeaderboard() {
     console.log("Fetching leaderboard data...");
     
-    // Use the new member_leaderboard view for optimized queries
-    const { data, error } = await supabase
-      .from("member_leaderboard")
-      .select("*")
-      .limit(100); // Limit for performance
-    
-    if (error) {
-      console.error("Error fetching leaderboard:", error);
+    try {
+      // Use the new member_leaderboard view for optimized queries
+      const { data, error } = await supabase
+        .from("member_leaderboard")
+        .select("*")
+        .limit(100); // Limit for performance
+      
+      if (error) {
+        console.error("Error fetching leaderboard:", error);
+        setLoading(false);
+        return;
+      }
+      
+      console.log("Raw leaderboard data:", data);
+      
+      const mapped: LeaderboardUser[] = (data || []).map((u: any) => {
+        // Ensure all values are properly handled with fallbacks
+        const totalXp = u.total_xp || 0;
+        const level = u.level || 1;
+        
+        return {
+          id: u.id,
+          name: u.name || 'Anonymous',
+          avatar: u.avatar,
+          xp: totalXp,
+          level: level,
+          levelProgress: Math.max(0, Math.min(100, u.level_progress || 0)), // Ensure valid range
+          coursesCompleted: u.courses_completed || 0,
+          streak: u.streak_days || 0,
+          badges: [], // Will be implemented with badge system later
+          isOnline: u.is_online || false,
+          joinDate: u.joined_at || new Date().toISOString(),
+          title: undefined, // Can be set based on achievements later
+          postsCount: u.posts_count || 0, // Map posts_count from database
+        };
+      });
+      
+      console.log("Mapped leaderboard users:", mapped);
+      setUsers(mapped);
       setLoading(false);
-      return;
+    } catch (error) {
+      console.error("Unexpected error fetching leaderboard:", error);
+      setUsers([]);
+      setLoading(false);
     }
-    
-    console.log("Raw leaderboard data:", data);
-    
-    const mapped: LeaderboardUser[] = (data || []).map((u: any) => {
-      return {
-        id: u.id,
-        name: u.name || 'Anonymous',
-        avatar: u.avatar,
-        xp: u.total_xp || 0,
-        level: u.level || 1,
-        levelProgress: u.level_progress || 0,
-        coursesCompleted: u.courses_completed || 0,
-        streak: u.streak_days || 0,
-        badges: [], // Will be implemented with badge system later
-        isOnline: u.is_online || false,
-        joinDate: u.joined_at,
-        title: undefined, // Can be set based on achievements later
-        postsCount: u.posts_count || 0, // Map posts_count from database
-      };
-    });
-    
-    console.log("Mapped leaderboard users:", mapped);
-    setUsers(mapped);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -82,6 +92,14 @@ export function useLeaderboardRealtime() {
         (payload) => {
           console.log("XP logs changed:", payload);
           fetchLeaderboard(); // Refetch when new XP is logged
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "posts" },
+        (payload) => {
+          console.log("Posts changed:", payload);
+          fetchLeaderboard(); // Refetch when posts change
         }
       )
       .subscribe();

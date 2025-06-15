@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
@@ -41,7 +42,7 @@ const filterOptions = [
   { value: 'top10', label: 'Top 10', icon: Crown },
   { value: 'online', label: 'Đang online', icon: TrendingUp },
   { value: 'streak', label: 'Streak cao', icon: Zap },
-  { value: 'chatters', label: 'Hay chat', icon: MessageSquare },
+  { value: 'chatters', label: 'Hay đăng bài', icon: FileText },
 ];
 
 const Members = () => {
@@ -74,7 +75,7 @@ const Members = () => {
     setIsRefreshing(false);
   };
 
-  // Transform and add required fields for MemberCard
+  // Transform and add required fields for MemberCard with better error handling
   const membersWithStats = members.map((member, i) => {
     const levelData = getLevel(member.xp || 0);
     return {
@@ -83,44 +84,47 @@ const Members = () => {
       badges: Array.isArray(member.badges) ? member.badges : [],
       title: member.title ?? '',
       rank: i + 1,
-      totalPoints: member.xp,
+      totalPoints: member.xp || 0,
       maxXp: levelData.maxXp,
       level: levelData.level,
-      levelProgress: member.levelProgress,
+      levelProgress: Math.max(0, Math.min(100, member.levelProgress || 0)),
       coursesCompleted: member.coursesCompleted ?? 0,
       streak: member.streak ?? 0,
-      joinDate: member.joinDate ?? '',
+      joinDate: member.joinDate ?? new Date().toISOString(),
       isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
-      // Use postsCount from the hook instead of messagesCount
-      messagesCount: member.postsCount ?? 0,
+      messagesCount: member.postsCount ?? 0, // Use postsCount from the hook
     };
   });
 
-  // Filter by Level and updated filter for posters (instead of chatters)
+  // Filter members with better validation
   const filteredMembers = membersWithStats.filter(member => {
     const matchesSearch = (member.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
       (filterType === 'top10' && member.rank <= 10) ||
       (filterType === 'online' && member.isOnline) ||
-      (filterType === 'streak' && member.streak >= 7) ||
-      (filterType === 'chatters' && member.messagesCount >= 5); // Changed threshold to 5 posts
+      (filterType === 'streak' && (member.streak || 0) >= 7) ||
+      (filterType === 'chatters' && (member.messagesCount || 0) >= 1); // Changed threshold to 1 post
     const matchesLevel = levelFilter ? member.level === levelFilter : true;
     return matchesSearch && matchesFilter && matchesLevel;
   });
 
-  // Calculate stats for header - updated to use posts count
+  // Calculate stats for header with safe defaults
   const totalMembers = members.length;
   const onlineMembers = members.filter(m => m.isOnline).length;
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
-  const newMembersThisWeek = members.filter(m => 
-    new Date(m.joinDate) > weekAgo
-  ).length;
+  const newMembersThisWeek = members.filter(m => {
+    try {
+      return new Date(m.joinDate) > weekAgo;
+    } catch {
+      return false;
+    }
+  }).length;
   const activePercentage = totalMembers > 0 
     ? Math.round((onlineMembers / totalMembers) * 100) 
     : 0;
 
-  // Get most active poster using postsCount - only if someone actually has posts
+  // Get most active poster safely
   const mostActivePoster = membersWithStats.length > 0 
     ? membersWithStats.reduce((prev, current) => 
         (prev.postsCount || 0) > (current.postsCount || 0) ? prev : current
@@ -133,7 +137,7 @@ const Members = () => {
   const topUsers = [
     {
       name: filteredMembers[0]?.name || "Chưa có dữ liệu",
-      achievement: `Rank #1 với ${filteredMembers[0]?.totalPoints?.toLocaleString() || 0} XP`,
+      achievement: `Rank #1 với ${(filteredMembers[0]?.totalPoints || 0).toLocaleString()} XP`,
       value: filteredMembers[0]?.totalPoints || 0
     },
     {
@@ -142,9 +146,9 @@ const Members = () => {
       value: hasActivePoster ? mostActivePoster.postsCount : 0
     },
     {
-      name: membersWithStats.filter(m => m.isOnline).length > 0 ? `${membersWithStats.filter(m => m.isOnline).length} thành viên` : "Chưa có dữ liệu",
+      name: onlineMembers > 0 ? `${onlineMembers} thành viên` : "Chưa có dữ liệu",
       achievement: "đang online",
-      value: membersWithStats.filter(m => m.isOnline).length
+      value: onlineMembers
     }
   ];
 
@@ -177,7 +181,7 @@ const Members = () => {
           <span className="text-white font-semibold">
             {filteredMembers[0]?.name || 'Chưa có dữ liệu'}
           </span>
-          <span className="text-sm text-slate-400">– Rank #1 với {filteredMembers[0]?.totalPoints?.toLocaleString() || 0} XP</span>
+          <span className="text-sm text-slate-400">– Rank #1 với {(filteredMembers[0]?.totalPoints || 0).toLocaleString()} XP</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-blue-400/20 to-cyan-500/20 rounded-xl py-3 px-4">
           <FileText className="w-5 h-5 text-blue-400" />
@@ -191,7 +195,7 @@ const Members = () => {
         <div className="flex items-center gap-2 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-xl py-3 px-4">
           <Crown className="w-5 h-5 text-purple-400" />
           <span className="text-white font-semibold">
-            {filteredMembers.filter(m => m.isOnline).length} thành viên
+            {onlineMembers} thành viên
           </span>
           <span className="text-sm text-slate-400">– đang online</span>
         </div>
@@ -282,14 +286,16 @@ const Members = () => {
       </div>
 
       {/* No Results */}
-      {filteredMembers.length === 0 && (
+      {filteredMembers.length === 0 && !loading && (
         <div className="text-center py-12">
           <Trophy className="w-16 h-16 text-slate-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">
             Không tìm thấy thành viên
           </h3>
           <p className="text-slate-400">
-            Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc
+            {members.length === 0 
+              ? "Chưa có thành viên nào trong hệ thống" 
+              : "Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc"}
           </p>
         </div>
       )}
@@ -300,7 +306,7 @@ const Members = () => {
           <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
           <h3 className="text-2xl font-bold text-white mb-2">Tham gia cuộc đua!</h3>
           <p className="text-slate-400 mb-6 max-w-md mx-auto">
-            Hoàn thành khóa học, tích lũy điểm và leo lên bảng xếp hạng. Gửi tin nhắn trong chat để tích lũy thêm XP!
+            Hoàn thành khóa học, tích lũy điểm và leo lên bảng xếp hạng. Đăng bài viết để tích lũy thêm XP!
           </p>
           <Button className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white font-semibold px-8 py-3">
             Bắt đầu học ngay
