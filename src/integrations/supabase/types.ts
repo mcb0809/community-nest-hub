@@ -638,6 +638,7 @@ export type Database = {
       }
       user_stats: {
         Row: {
+          comments_count: number | null
           courses_completed: number
           created_at: string
           current_streak: number | null
@@ -645,8 +646,10 @@ export type Database = {
           last_activity: string | null
           last_login_date: string | null
           level: number
+          likes_count: number | null
           longest_streak: number | null
           posts_count: number
+          shares_count: number | null
           streak_days: number
           total_online_hours: number | null
           total_xp: number
@@ -654,6 +657,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          comments_count?: number | null
           courses_completed?: number
           created_at?: string
           current_streak?: number | null
@@ -661,8 +665,10 @@ export type Database = {
           last_activity?: string | null
           last_login_date?: string | null
           level?: number
+          likes_count?: number | null
           longest_streak?: number | null
           posts_count?: number
+          shares_count?: number | null
           streak_days?: number
           total_online_hours?: number | null
           total_xp?: number
@@ -670,6 +676,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          comments_count?: number | null
           courses_completed?: number
           created_at?: string
           current_streak?: number | null
@@ -677,8 +684,10 @@ export type Database = {
           last_activity?: string | null
           last_login_date?: string | null
           level?: number
+          likes_count?: number | null
           longest_streak?: number | null
           posts_count?: number
+          shares_count?: number | null
           streak_days?: number
           total_online_hours?: number | null
           total_xp?: number
@@ -686,6 +695,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "user_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "member_leaderboard"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_stats_user_id_fkey"
             columns: ["user_id"]
@@ -746,6 +762,13 @@ export type Database = {
             foreignKeyName: "xp_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "member_leaderboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xp_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
@@ -780,11 +803,37 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      member_leaderboard: {
+        Row: {
+          avatar: string | null
+          comments_count: number | null
+          courses_completed: number | null
+          email: string | null
+          id: string | null
+          is_online: boolean | null
+          joined_at: string | null
+          last_activity: string | null
+          level: number | null
+          level_progress: number | null
+          likes_count: number | null
+          longest_streak: number | null
+          name: string | null
+          posts_count: number | null
+          shares_count: number | null
+          streak_days: number | null
+          total_online_hours: number | null
+          total_xp: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_level: {
         Args: { total_xp: number }
+        Returns: number
+      }
+      calculate_level_progress: {
+        Args: { total_xp: number; current_level: number }
         Returns: number
       }
       handle_daily_login: {
@@ -793,6 +842,19 @@ export type Database = {
       }
       log_online_time: {
         Args: { user_id_param: string; hours_online: number }
+        Returns: undefined
+      }
+      log_xp_action: {
+        Args: {
+          p_user_id: string
+          p_action_type: string
+          p_description?: string
+          p_related_id?: string
+        }
+        Returns: number
+      }
+      recalculate_user_stats: {
+        Args: { target_user_id?: string }
         Returns: undefined
       }
     }

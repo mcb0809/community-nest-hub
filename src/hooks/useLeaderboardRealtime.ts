@@ -14,24 +14,7 @@ export interface LeaderboardUser {
   badges: string[];
   isOnline: boolean;
   joinDate: string;
-  title?: string; // Added optional title property
-}
-
-const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
-
-function getLevel(xp: number) {
-  let acc = 0;
-  for (let i = 0; i < levelThresholds.length; i++) {
-    acc += levelThresholds[i];
-    if (xp < acc) {
-      return {
-        level: i + 1,
-        progress: Math.round((xp - (acc - levelThresholds[i])) * 100 / levelThresholds[i]),
-        maxXp: acc,
-      };
-    }
-  }
-  return { level: 10, progress: 100, maxXp: acc };
+  title?: string;
 }
 
 export function useLeaderboardRealtime() {
@@ -39,23 +22,13 @@ export function useLeaderboardRealtime() {
   const [loading, setLoading] = useState(true);
 
   async function fetchLeaderboard() {
-    // Join user_profiles and user_stats, rank by total_xp desc
+    console.log("Fetching leaderboard data...");
+    
+    // Use the new member_leaderboard view for optimized queries
     const { data, error } = await supabase
-      .from("user_profiles")
-      .select(`
-        id,
-        display_name,
-        avatar_url,
-        created_at,
-        user_stats!inner (
-          total_xp,
-          courses_completed,
-          current_streak,
-          last_activity,
-          longest_streak
-        )
-      `)
-      .order("user_stats.total_xp", { ascending: false });
+      .from("member_leaderboard")
+      .select("*")
+      .limit(100); // Limit for performance
     
     if (error) {
       console.error("Error fetching leaderboard:", error);
@@ -63,41 +36,51 @@ export function useLeaderboardRealtime() {
       return;
     }
     
+    console.log("Raw leaderboard data:", data);
+    
     const mapped: LeaderboardUser[] = (data || []).map((u: any) => {
-      const xp = u.user_stats?.total_xp || 0;
-      const levelData = getLevel(xp);
       return {
         id: u.id,
-        name: u.display_name || 'Anonymous',
-        avatar: u.avatar_url,
-        xp,
-        level: levelData.level,
-        levelProgress: levelData.progress,
-        coursesCompleted: u.user_stats?.courses_completed || 0,
-        streak: u.user_stats?.current_streak || 0,
-        badges: [], // Will be implemented later
-        isOnline: !!(
-          u.user_stats &&
-          u.user_stats.last_activity &&
-          new Date().getTime() - new Date(u.user_stats.last_activity).getTime() < 30 * 60 * 1000
-        ),
-        joinDate: u.created_at,
+        name: u.name || 'Anonymous',
+        avatar: u.avatar,
+        xp: u.total_xp || 0,
+        level: u.level || 1,
+        levelProgress: u.level_progress || 0,
+        coursesCompleted: u.courses_completed || 0,
+        streak: u.streak_days || 0,
+        badges: [], // Will be implemented with badge system later
+        isOnline: u.is_online || false,
+        joinDate: u.joined_at,
         title: undefined, // Can be set based on achievements later
       };
     });
+    
+    console.log("Mapped leaderboard users:", mapped);
     setUsers(mapped);
     setLoading(false);
   }
 
   useEffect(() => {
     fetchLeaderboard();
-    // Listen for realtime changes from user_stats
+    
+    // Listen for realtime changes from user_stats table
     const channel = supabase
-      .channel("realtime-user_stats")
+      .channel("realtime-leaderboard")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_stats" },
-        fetchLeaderboard
+        (payload) => {
+          console.log("User stats changed:", payload);
+          fetchLeaderboard(); // Refetch when user_stats changes
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "xp_logs" },
+        (payload) => {
+          console.log("XP logs changed:", payload);
+          fetchLeaderboard(); // Refetch when new XP is logged
+        }
       )
       .subscribe();
 
@@ -108,3 +91,49 @@ export function useLeaderboardRealtime() {
 
   return { users, loading };
 }
+
+// Utility function to log XP actions
+export const logXPAction = async (
+  userId: string,
+  actionType: string,
+  description?: string,
+  relatedId?: string
+): Promise<number> => {
+  try {
+    const { data, error } = await supabase.rpc('log_xp_action', {
+      p_user_id: userId,
+      p_action_type: actionType,
+      p_description: description,
+      p_related_id: relatedId
+    });
+
+    if (error) {
+      console.error('Error logging XP action:', error);
+      return 0;
+    }
+
+    console.log(`XP Action logged: ${actionType} +${data}XP for user ${userId}`);
+    return data || 0;
+  } catch (error) {
+    console.error('Error calling log_xp_action:', error);
+    return 0;
+  }
+};
+
+// Utility function to recalculate user stats
+export const recalculateUserStats = async (userId?: string): Promise<void> => {
+  try {
+    const { error } = await supabase.rpc('recalculate_user_stats', {
+      target_user_id: userId || null
+    });
+
+    if (error) {
+      console.error('Error recalculating user stats:', error);
+      return;
+    }
+
+    console.log(`User stats recalculated for ${userId ? `user ${userId}` : 'all users'}`);
+  } catch (error) {
+    console.error('Error calling recalculate_user_stats:', error);
+  }
+};

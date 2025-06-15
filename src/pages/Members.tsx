@@ -10,11 +10,13 @@ import {
   Trophy,
   Crown,
   TrendingUp,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { ChevronDown } from "lucide-react";
 import { Card, CardContent } from '@/components/ui/card';
-import { useLeaderboardRealtime } from '@/hooks/useLeaderboardRealtime';
+import { useLeaderboardRealtime, recalculateUserStats } from '@/hooks/useLeaderboardRealtime';
+import { useToast } from '@/hooks/use-toast';
 
 const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
 
@@ -45,9 +47,30 @@ const Members = () => {
   const [filterType, setFilterType] = useState('all');
   const [showXPModal, setShowXPModal] = useState(false);
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
 
-  // Get realtime data from Supabase
+  // Get realtime data from Supabase using the new optimized view
   const { users: members, loading } = useLeaderboardRealtime();
+
+  // Handle manual refresh/recalculation
+  const handleRefreshStats = async () => {
+    setIsRefreshing(true);
+    try {
+      await recalculateUserStats();
+      toast({
+        title: "Stats Updated",
+        description: "All user statistics have been recalculated",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh statistics",
+        variant: "destructive",
+      });
+    }
+    setIsRefreshing(false);
+  };
 
   // Transform and add required fields for MemberCard
   const membersWithStats = members.map((member, i) => {
@@ -56,12 +79,12 @@ const Members = () => {
       ...member,
       avatar: member.avatar ?? '',
       badges: Array.isArray(member.badges) ? member.badges : [],
-      title: member.title ?? '', // Now properly handled
+      title: member.title ?? '',
       rank: i + 1,
       totalPoints: member.xp,
       maxXp: levelData.maxXp,
       level: levelData.level,
-      levelProgress: levelData.progress,
+      levelProgress: member.levelProgress, // Use calculated progress from database
       coursesCompleted: member.coursesCompleted ?? 0,
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? '',
@@ -80,6 +103,17 @@ const Members = () => {
     return matchesSearch && matchesFilter && matchesLevel;
   });
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-slate-400">Đang tải bảng xếp hạng...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Gamification Header */}
@@ -89,18 +123,24 @@ const Members = () => {
       <div className="flex flex-col md:flex-row items-center justify-center gap-4">
         <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-400/20 to-purple-500/20 rounded-xl py-3 px-4">
           <Trophy className="w-5 h-5 text-yellow-400" />
-          <span className="text-white font-semibold">Hoàng Minh</span>
-          <span className="text-sm text-slate-400">– Hoàn thành 5 khóa học</span>
+          <span className="text-white font-semibold">
+            {filteredMembers[0]?.name || 'Chưa có dữ liệu'}
+          </span>
+          <span className="text-sm text-slate-400">– Rank #1 với {filteredMembers[0]?.totalPoints.toLocaleString() || 0} XP</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-green-400/20 to-cyan-500/20 rounded-xl py-3 px-4">
           <Zap className="w-5 h-5 text-green-400" />
-          <span className="text-white font-semibold">Lan Anh</span>
-          <span className="text-sm text-slate-400">– 30 ngày streak</span>
+          <span className="text-white font-semibold">
+            {filteredMembers.find(m => m.streak >= 7)?.name || 'Chưa có dữ liệu'}
+          </span>
+          <span className="text-sm text-slate-400">– {filteredMembers.find(m => m.streak >= 7)?.streak || 0} ngày streak</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-xl py-3 px-4">
           <Crown className="w-5 h-5 text-purple-400" />
-          <span className="text-white font-semibold">Đức Thành</span>
-          <span className="text-sm text-slate-400">– Top 1 điểm số tháng</span>
+          <span className="text-white font-semibold">
+            {filteredMembers.filter(m => m.isOnline).length} thành viên
+          </span>
+          <span className="text-sm text-slate-400">– đang online</span>
         </div>
       </div>
 
@@ -133,14 +173,15 @@ const Members = () => {
                   {option.label}
                 </Button>
               ))}
-              {/* Bộ lọc theo Level */}
+              
+              {/* Level Filter */}
               <div className="relative">
                 <Button
                   variant="outline"
                   className="flex items-center gap-1 border-slate-600 text-slate-300 px-3"
                   onClick={() => setLevelFilter(levelFilter ? null : 1)}
                 >
-                  Lọc Level
+                  {levelFilter ? `Level ${levelFilter}` : 'Lọc Level'}
                   <ChevronDown className="w-4 h-4" />
                 </Button>
                 {levelFilter !== null && (
@@ -155,13 +196,25 @@ const Members = () => {
                   </div>
                 )}
               </div>
-              {/* Nút mở Modal XP */}
+
+              {/* XP Info Button */}
               <Button
                 variant="outline"
                 className="flex items-center gap-1 border-slate-600 text-slate-300 px-3"
                 onClick={() => setShowXPModal(true)}
               >
                 🔎 XP là gì?
+              </Button>
+
+              {/* Refresh Stats Button */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-1 border-slate-600 text-slate-300 px-3"
+                onClick={handleRefreshStats}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Cập nhật
               </Button>
             </div>
           </div>
