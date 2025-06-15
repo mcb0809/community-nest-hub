@@ -505,6 +505,80 @@ export type Database = {
           },
         ]
       }
+      post_attachments: {
+        Row: {
+          id: string
+          meta: Json | null
+          name: string
+          post_id: string | null
+          type: string
+          uploaded_at: string | null
+          url: string
+        }
+        Insert: {
+          id?: string
+          meta?: Json | null
+          name: string
+          post_id?: string | null
+          type: string
+          uploaded_at?: string | null
+          url: string
+        }
+        Update: {
+          id?: string
+          meta?: Json | null
+          name?: string
+          post_id?: string | null
+          type?: string
+          uploaded_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_attachments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          id: string
+          is_pinned: boolean | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+          visibility: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+          visibility?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+          visibility?: string | null
+        }
+        Relationships: []
+      }
       social_links: {
         Row: {
           created_at: string
