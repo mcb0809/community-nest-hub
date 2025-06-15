@@ -22,6 +22,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminLandingPage from "./pages/admin/AdminLandingPage";
 import AdminEvents from "./pages/admin/AdminEvents";
+import AdminDocuments from "./pages/admin/AdminDocuments";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
@@ -51,7 +52,7 @@ const App = () => (
                       <Route path="course/:courseId" element={<CourseDetail />} />
                       <Route path="messages" element={<div className="text-white">Messages Management - Coming Soon</div>} />
                       <Route path="events" element={<AdminEvents />} />
-                      <Route path="documents" element={<div className="text-white">Documents Management - Coming Soon</div>} />
+                      <Route path="documents" element={<AdminDocuments />} />
                       <Route path="database" element={<div className="text-white">Database Management - Coming Soon</div>} />
                       <Route path="analytics" element={<div className="text-white">Analytics - Coming Soon</div>} />
                       <Route path="settings" element={<div className="text-white">Settings - Coming Soon</div>} />

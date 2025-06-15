@@ -185,6 +185,54 @@ export type Database = {
         }
         Relationships: []
       }
+      documents: {
+        Row: {
+          access_level: string | null
+          category: string
+          created_at: string | null
+          description: string | null
+          downloads: number | null
+          file_size: number
+          file_type: string
+          file_url: string
+          id: string
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          access_level?: string | null
+          category: string
+          created_at?: string | null
+          description?: string | null
+          downloads?: number | null
+          file_size: number
+          file_type: string
+          file_url: string
+          id?: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          access_level?: string | null
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          downloads?: number | null
+          file_size?: number
+          file_type?: string
+          file_url?: string
+          id?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       event_registrations: {
         Row: {
           event_id: string | null
