@@ -40,6 +40,20 @@ export const useChat = () => {
     }
   }, []);
 
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('id, display_name, avatar_url, role')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+    return data;
+  }, []);
+
   const fetchMessages = useCallback(async () => {
     if (!selectedChannel) return;
 
@@ -97,6 +111,27 @@ export const useChat = () => {
     }
   }, [selectedChannel]);
 
+  const addNewMessage = useCallback(async (newMessageData: any) => {
+    // Fetch user profile for the new message
+    const userProfile = await fetchUserProfile(newMessageData.user_id);
+    
+    const newMessage: Message = {
+      id: newMessageData.id,
+      content: newMessageData.content,
+      channel_id: newMessageData.channel_id,
+      user_id: newMessageData.user_id,
+      created_at: newMessageData.created_at,
+      updated_at: newMessageData.updated_at,
+      reactions: newMessageData.reactions || {},
+      reply_to: newMessageData.reply_to,
+      user_profiles: userProfile,
+      reply_message: null,
+      attachments: []
+    };
+
+    setMessages(prevMessages => [...prevMessages, newMessage]);
+  }, [fetchUserProfile]);
+
   const sendMessage = async (
     content: string, 
     replyToId?: string, 
@@ -142,8 +177,8 @@ export const useChat = () => {
         );
       }
 
-      // Refresh messages to show the new one
-      await fetchMessages();
+      // Don't fetch all messages, just add the new one with user profile
+      await addNewMessage(messageData);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -259,15 +294,46 @@ export const useChat = () => {
     fetchMessages();
   }, [fetchMessages]);
 
+  // Real-time subscription for new messages
   useEffect(() => {
+    if (!selectedChannel) return;
+
     const channel = supabase
-      .channel('public:messages')
+      .channel(`messages-${selectedChannel}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages' },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `channel_id=eq.${selectedChannel}`
+        },
+        async (payload) => {
+          console.log('New message received!', payload);
+          // Only add the message if it's not from the current user (to avoid duplicates)
+          if (payload.new.user_id !== user?.id) {
+            await addNewMessage(payload.new);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `channel_id=eq.${selectedChannel}`
+        },
         (payload) => {
-          console.log('Message received!', payload);
-          fetchMessages();
+          console.log('Message updated!', payload);
+          // Update the message in local state (for reactions, etc.)
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === payload.new.id 
+                ? { ...msg, reactions: payload.new.reactions || {} }
+                : msg
+            )
+          );
         }
       )
       .subscribe();
@@ -275,7 +341,7 @@ export const useChat = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchMessages]);
+  }, [selectedChannel, user?.id, addNewMessage]);
 
   return {
     channels,
