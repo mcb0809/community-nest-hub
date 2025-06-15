@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useLevelConfig } from "./useLevelConfig";
@@ -29,6 +29,10 @@ export function useLeaderboardRealtime() {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
+  
+  // Use ref to track if we already have an active subscription
+  const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   async function fetchLeaderboard() {
     console.log("Fetching leaderboard data...");
@@ -147,16 +151,18 @@ export function useLeaderboardRealtime() {
   }
 
   useEffect(() => {
-    // Only proceed if we have the required data
-    if (!levelConfigs.length || !user?.id) {
+    // Only proceed if we have the required data and no active subscription
+    if (!levelConfigs.length || !user?.id || isSubscribedRef.current) {
       return;
     }
+
+    console.log("Setting up leaderboard realtime subscription for user:", user.id);
 
     // Initial fetch
     fetchLeaderboard();
     
     // Create a unique channel name to avoid conflicts
-    const channelName = `leaderboard-${Date.now()}-${Math.random()}`;
+    const channelName = `leaderboard-${user.id}-${Date.now()}`;
     
     // Set up a single presence channel for tracking online users and current user presence
     const presenceChannel = supabase.channel(channelName, {
@@ -166,6 +172,10 @@ export function useLeaderboardRealtime() {
         },
       },
     });
+
+    // Store channel reference
+    channelRef.current = presenceChannel;
+    isSubscribedRef.current = true;
 
     // Listen for presence sync events
     presenceChannel
@@ -261,13 +271,17 @@ export function useLeaderboardRealtime() {
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      console.log('Cleaning up channels and event listeners');
+      console.log('Cleaning up leaderboard realtime subscription');
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
       // Untrack presence before removing channel
-      presenceChannel.untrack();
-      supabase.removeChannel(presenceChannel);
+      if (channelRef.current) {
+        channelRef.current.untrack();
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      isSubscribedRef.current = false;
     };
   }, [user?.id, levelConfigs.length]); // Only depend on user ID and level configs being loaded
 
