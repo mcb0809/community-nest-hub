@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import MemberCard from '@/components/members/MemberCard';
+import LeaderboardHeader from '@/components/members/LeaderboardHeader';
+import XPExplanationModal from "@/components/members/XPExplanationModal";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { 
   Search, 
-  Filter,
   Trophy,
   Crown,
   TrendingUp,
   Zap
 } from 'lucide-react';
-import MemberCard from '@/components/members/MemberCard';
-import LeaderboardHeader from '@/components/members/LeaderboardHeader';
-import XPExplanationModal from "@/components/members/XPExplanationModal";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { ChevronDown } from "lucide-react";
+import { Card, CardContent } from '@/components/ui/card';
+import { useLeaderboardRealtime } from '@/hooks/useLeaderboardRealtime';
 
 const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
 
@@ -189,16 +187,16 @@ const Members = () => {
   const [showXPModal, setShowXPModal] = useState(false);
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
 
-  // Sử dụng getLeaderboardData() thay cho mảng members
-  const members = getLeaderboardData();
+  // Thay vì getLeaderboardData(), dùng dữ liệu realtime
+  const { users: members, loading } = useLeaderboardRealtime();
 
   // Bổ sung lọc theo Level
   const filteredMembers = members.filter(member => {
     const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
-      (filterType === 'top10' && member.rank <= 10) ||
+      (filterType === 'top10' && members.indexOf(member) < 10) ||
       (filterType === 'online' && member.isOnline) ||
-      (filterType === 'streak' && member.streak >= 20);
+      (filterType === 'streak' && member.streak >= 7);
     const matchesLevel = levelFilter ? member.level === levelFilter : true;
     return matchesSearch && matchesFilter && matchesLevel;
   });

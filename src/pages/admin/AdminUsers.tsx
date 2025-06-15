@@ -15,6 +15,7 @@ import LeaderboardHeader from '@/components/members/LeaderboardHeader';
 import UserTable from '@/components/admin/users/UserTable';
 import UserDetailDrawer from '@/components/admin/users/UserDetailDrawer';
 import XPConfigForm from '@/components/admin/users/XPConfigForm';
+import { useLeaderboardRealtime } from "@/hooks/useLeaderboardRealtime";
 
 interface UserProfile {
   id: string;
@@ -129,6 +130,8 @@ const AdminUsers = () => {
       isOnline: false
     }
   ];
+
+  const { users: leaderboardUsers } = useLeaderboardRealtime();
 
   useEffect(() => {
     fetchUsers();
@@ -387,10 +390,8 @@ const AdminUsers = () => {
         {/* Leaderboard Tab */}
         <TabsContent value="leaderboard" className="space-y-8">
           <LeaderboardHeader />
-          
-          {/* Members Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {members.map((member, index) => (
+            {leaderboardUsers.map((member, index) => (
               <MemberCard key={member.id} member={member} index={index} />
             ))}
           </div>
