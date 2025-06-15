@@ -1,6 +1,6 @@
 
 import { useState, useMemo } from 'react';
-import { Message } from '@/hooks/useChat';
+import { Message } from '@/types';
 
 export const useMessageSearch = (messages: Message[]) => {
   const [searchQuery, setSearchQuery] = useState('');

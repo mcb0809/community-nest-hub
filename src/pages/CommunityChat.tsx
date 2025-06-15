@@ -93,6 +93,10 @@ const CommunityChat = () => {
     await signOut();
   };
 
+  const handleCreateChannel = (name: string, description: string, icon: string) => {
+    createChannel(name, description, icon);
+  };
+
   const handleEditChannel = (data: { 
     id: string; 
     name: string; 
@@ -152,7 +156,7 @@ const CommunityChat = () => {
           messages={isAuthenticated ? messages : []}
           unreadCounts={unreadCounts}
           onChannelSelect={setSelectedChannel}
-          onCreateChannel={createChannel}
+          onCreateChannel={handleCreateChannel}
         />
 
         {/* Main Chat Area */}

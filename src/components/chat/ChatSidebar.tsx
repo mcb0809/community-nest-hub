@@ -4,7 +4,7 @@ import { Hash, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ChannelItem from './ChannelItem';
 import CreateChannelModal from './CreateChannelModal';
-import { Channel, Message } from '@/hooks/useChat';
+import { Channel, Message } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 
@@ -14,7 +14,7 @@ interface ChatSidebarProps {
   messages: Message[];
   unreadCounts: Record<string, number>;
   onChannelSelect: (channelId: string) => void;
-  onCreateChannel: (name: string, description: string) => void;
+  onCreateChannel: (name: string, description: string, icon: string) => void;
 }
 
 const ChatSidebar = ({ channels, selectedChannel, messages, unreadCounts, onChannelSelect, onCreateChannel }: ChatSidebarProps) => {

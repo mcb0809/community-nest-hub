@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -216,82 +217,6 @@ export const useChat = () => {
     }
   };
 
-  const calculateUnreadCounts = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      // Fetch the last read timestamps for each channel
-      const { data: lastReadData, error: lastReadError } = await supabase
-        .from('user_channel_reads')
-        .select('channel_id, last_read_at')
-        .eq('user_id', user.id);
-
-      if (lastReadError) {
-        console.error('Error fetching last read timestamps:', lastReadError);
-        return;
-      }
-
-      const lastReadByChannel: { [channelId: string]: string } = {};
-      lastReadData.forEach(item => {
-        lastReadByChannel[item.channel_id] = item.last_read_at;
-      });
-
-      // Calculate unread counts for each channel
-      const unreadCountsByChannel: UnreadCounts = {};
-      for (const channel of channels) {
-        const lastReadAt = lastReadByChannel[channel.id];
-
-        const { count, error: countError } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact' })
-          .eq('channel_id', channel.id)
-          .gt('created_at', lastReadAt || new Date(0).toISOString()); // Messages after last read
-
-        if (countError) {
-          console.error('Error fetching unread message count:', countError);
-          continue;
-        }
-
-        unreadCountsByChannel[channel.id] = count || 0;
-      }
-
-      setUnreadCounts(unreadCountsByChannel);
-    } catch (error) {
-      console.error('Error calculating unread counts:', error);
-    }
-  }, [user, channels]);
-
-  // Call this function when a user reads a channel
-  const markChannelAsRead = async (channelId: string) => {
-    if (!user?.id) return;
-
-    try {
-      // Update or insert the last read timestamp for the user and channel
-      const { error } = await supabase
-        .from('user_channel_reads')
-        .upsert(
-          {
-            user_id: user.id,
-            channel_id: channelId,
-            last_read_at: new Date().toISOString(),
-          },
-          { onConflict: ['user_id', 'channel_id'] }
-        );
-
-      if (error) {
-        console.error('Error marking channel as read:', error);
-      } else {
-        // Optimistically update the local state
-        setUnreadCounts(prevUnreadCounts => ({
-          ...prevUnreadCounts,
-          [channelId]: 0,
-        }));
-      }
-    } catch (error) {
-      console.error('Error marking channel as read:', error);
-    }
-  };
-
   useEffect(() => {
     fetchChannels();
   }, [fetchChannels]);
@@ -299,16 +224,6 @@ export const useChat = () => {
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
-
-  useEffect(() => {
-    calculateUnreadCounts();
-  }, [calculateUnreadCounts]);
-
-  useEffect(() => {
-    if (selectedChannel) {
-      markChannelAsRead(selectedChannel);
-    }
-  }, [selectedChannel, markChannelAsRead]);
 
   useEffect(() => {
     const channel = supabase
@@ -319,7 +234,6 @@ export const useChat = () => {
         (payload) => {
           console.log('Message received!', payload);
           fetchMessages();
-          calculateUnreadCounts();
         }
       )
       .subscribe();
@@ -327,7 +241,7 @@ export const useChat = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchMessages, calculateUnreadCounts]);
+  }, [fetchMessages]);
 
   return {
     channels,
