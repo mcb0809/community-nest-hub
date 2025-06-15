@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,13 +16,16 @@ import {
   Crown,
   Youtube,
   Play,
-  Sparkles,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Copy,
+  Check
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Post } from '@/hooks/usePosts';
 import { useAuth } from '@/hooks/useAuth';
-import { useCommunityXP } from '@/hooks/useCommunityXP';
+import { usePostInteractions } from '@/hooks/usePostInteractions';
+import PostComments from './PostComments';
+import { useToast } from '@/hooks/use-toast';
 
 interface PostCardProps {
   post: Post;
@@ -34,15 +36,23 @@ interface PostCardProps {
 
 const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
   const { user, isAdmin } = useAuth();
-  const { handleLike, handleComment, handleShare } = useCommunityXP();
+  const { toast } = useToast();
   const isOwner = user?.id === post.user_id;
   const canManage = isOwner || isAdmin();
 
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [commentCount, setCommentCount] = useState(0);
+  const {
+    interaction,
+    comments,
+    loading: interactionLoading,
+    toggleLike,
+    addComment,
+    deleteComment,
+    toggleShare,
+  } = usePostInteractions(post.id);
+
+  const [showComments, setShowComments] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
-  const [commentText, setCommentText] = useState('');
+  const [shareClicked, setShareClicked] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
@@ -65,59 +75,41 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
     }
   };
 
-  const handleDownloadAttachment = (url: string, name: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleLikeClick = async () => {
-    if (!user?.id) return;
-
-    try {
-      await handleLike(post.id);
-      setIsLiked(!isLiked);
-      setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
-    } catch (error) {
-      console.error('Error liking post:', error);
-    }
-  };
-
-  const handleCommentClick = () => {
-    setShowCommentInput(!showCommentInput);
-  };
-
-  const handleCommentSubmit = async () => {
-    if (!user?.id || !commentText.trim()) return;
-
-    try {
-      await handleComment(post.id);
-      setCommentCount(prev => prev + 1);
-      setCommentText('');
-      setShowCommentInput(false);
-    } catch (error) {
-      console.error('Error commenting on post:', error);
-    }
-  };
-
   const handleShareClick = async () => {
     if (!user?.id) return;
 
     try {
-      await handleShare(post.id);
-      // Copy post link to clipboard
-      const postUrl = `${window.location.origin}/community#post-${post.id}`;
-      await navigator.clipboard.writeText(postUrl);
+      await toggleShare();
+      
+      // Show visual feedback
+      setShareClicked(true);
+      setTimeout(() => setShareClicked(false), 1000);
+
+      if (!interaction.userShared) {
+        toast({
+          title: "Đã chia sẻ!",
+          description: "Link bài viết đã được sao chép vào clipboard",
+        });
+      }
     } catch (error) {
       console.error('Error sharing post:', error);
     }
   };
 
-  // Extract YouTube videos from content
+  const handleCommentClick = () => {
+    setShowComments(!showComments);
+    if (!showComments) {
+      setShowCommentInput(false);
+    }
+  };
+
+  const handleAddCommentClick = () => {
+    if (!showComments) {
+      setShowComments(true);
+    }
+    setShowCommentInput(!showCommentInput);
+  };
+
   const extractYouTubeVideos = (content: string) => {
     const regex = /\[YOUTUBE:([a-zA-Z0-9_-]{11})\]/g;
     const matches = [];
@@ -128,18 +120,15 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
     return matches;
   };
 
-  // Remove YouTube markers from content for display
   const cleanContent = (content: string) => {
     return content.replace(/\[YOUTUBE:[a-zA-Z0-9_-]{11}\]/g, '').trim();
   };
 
-  // Handle YouTube thumbnail click
   const handleYouTubeClick = (videoId: string) => {
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
     window.open(youtubeUrl, '_blank');
   };
 
-  // Get image attachments
   const getImageAttachments = () => {
     return post.attachments?.filter(att => att.type === 'file' && att.meta?.type?.startsWith('image/')) || [];
   };
@@ -148,7 +137,6 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
   const displayContent = post.content ? cleanContent(post.content) : '';
   const imageAttachments = getImageAttachments();
 
-  // Create preview section with images/videos
   const renderPreviewMedia = () => {
     const hasYoutube = youtubeVideos.length > 0;
     const hasImages = imageAttachments.length > 0;
@@ -157,7 +145,6 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
 
     return (
       <div className="mb-4">
-        {/* YouTube Thumbnails */}
         {hasYoutube && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
             {youtubeVideos.slice(0, 3).map((videoId, index) => (
@@ -194,7 +181,6 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
           </div>
         )}
 
-        {/* Image Attachments */}
         {hasImages && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {imageAttachments.slice(0, 3).map((attachment, index) => (
@@ -290,7 +276,6 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Preview Media Section */}
         {renderPreviewMedia()}
 
         {displayContent && (
@@ -301,7 +286,6 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
           </div>
         )}
 
-        {/* Tags */}
         {post.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {post.tags.slice(0, 5).map((tag, index) => (
@@ -321,7 +305,6 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
           </div>
         )}
 
-        {/* Media Count Indicators */}
         {(youtubeVideos.length > 0 || imageAttachments.length > 0 || (post.attachments && post.attachments.length > imageAttachments.length)) && (
           <div className="flex items-center gap-4 text-sm text-slate-400">
             {youtubeVideos.length > 0 && (
@@ -345,73 +328,85 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
           </div>
         )}
 
-        {/* Comment Input */}
-        {showCommentInput && (
-          <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-600">
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Viết bình luận của bạn..."
-              className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 resize-none focus:outline-none focus:border-purple-500"
-              rows={3}
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCommentInput(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                Hủy
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleCommentSubmit}
-                disabled={!commentText.trim()}
-                className="bg-purple-500 hover:bg-purple-600 text-white"
-              >
-                Đăng
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* Actions */}
         <div className="flex items-center justify-between pt-4 border-t border-slate-700">
           <div className="flex items-center space-x-6">
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={handleLikeClick}
-              className={`flex items-center gap-2 transition-colors ${
-                isLiked 
+              onClick={toggleLike}
+              disabled={interactionLoading}
+              className={`flex items-center gap-2 transition-all duration-200 ${
+                interaction.userLiked 
                   ? 'text-red-400 hover:text-red-300' 
                   : 'text-slate-400 hover:bg-red-500/10 hover:text-red-400'
               }`}
             >
-              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-              <span className="text-sm">{likeCount}</span>
+              <Heart className={`w-4 h-4 transition-transform duration-200 ${
+                interaction.userLiked ? 'fill-current scale-110' : ''
+              }`} />
+              <span className="text-sm font-medium">{interaction.likes}</span>
             </Button>
+            
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={handleCommentClick}
-              className="flex items-center gap-2 hover:bg-blue-500/10 hover:text-blue-400 text-slate-400 transition-colors"
+              className={`flex items-center gap-2 transition-all duration-200 ${
+                showComments
+                  ? 'text-blue-400 hover:text-blue-300'
+                  : 'text-slate-400 hover:bg-blue-500/10 hover:text-blue-400'
+              }`}
             >
-              <MessageCircle className="w-4 h-4" />
-              <span className="text-sm">{commentCount}</span>
+              <MessageCircle className={`w-4 h-4 ${showComments ? 'fill-current' : ''}`} />
+              <span className="text-sm font-medium">{interaction.comments}</span>
             </Button>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleShareClick}
-            className="flex items-center gap-2 hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-colors"
-          >
-            <Share2 className="w-4 h-4" />
-            Chia sẻ
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleAddCommentClick}
+              className="text-slate-400 hover:bg-purple-500/10 hover:text-purple-400 transition-colors"
+            >
+              <MessageCircle className="w-4 h-4 mr-1" />
+              Bình luận
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleShareClick}
+              disabled={interactionLoading}
+              className={`flex items-center gap-2 transition-all duration-200 ${
+                interaction.userShared
+                  ? 'text-green-400 hover:text-green-300'
+                  : 'text-slate-400 hover:bg-green-500/10 hover:text-green-400'
+              }`}
+            >
+              {shareClicked ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+              <span className="text-sm">{interaction.shares > 0 ? interaction.shares : 'Chia sẻ'}</span>
+            </Button>
+          </div>
         </div>
+
+        {/* Comments Section */}
+        {showComments && (
+          <div className="pt-4 border-t border-slate-700">
+            <PostComments
+              comments={comments}
+              onAddComment={addComment}
+              onDeleteComment={deleteComment}
+              showInput={showCommentInput}
+              onToggleInput={() => setShowCommentInput(!showCommentInput)}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
