@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./useAuth";
 
 export interface LeaderboardUser {
   id: string;
@@ -22,12 +23,13 @@ export function useLeaderboardRealtime() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
 
   async function fetchLeaderboard() {
     console.log("Fetching leaderboard data...");
     
     try {
-      // First try to get data from user_profiles with basic stats
+      // Get user profiles data
       const { data: profilesData, error: profilesError } = await supabase
         .from("user_profiles")
         .select(`
@@ -85,7 +87,7 @@ export function useLeaderboardRealtime() {
         const totalXp = userStats?.total_xp || 0;
         const level = userStats?.level || 1;
         
-        // Simple level progress calculation to avoid database function issues
+        // Simple level progress calculation
         const calculateSimpleLevelProgress = (xp: number, currentLevel: number) => {
           const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000, 25000];
           
@@ -138,7 +140,7 @@ export function useLeaderboardRealtime() {
   useEffect(() => {
     fetchLeaderboard();
     
-    // Set up presence tracking channel
+    // Set up a single presence channel for tracking online users and current user presence
     const presenceChannel = supabase.channel('online-users', {
       config: {
         presence: {
@@ -176,8 +178,8 @@ export function useLeaderboardRealtime() {
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           // Track current user's presence if authenticated
-          const { data: { user } } = await supabase.auth.getUser();
           if (user) {
+            console.log('Tracking user presence:', user.id);
             await presenceChannel.track({
               user_id: user.id,
               online_at: new Date().toISOString(),
@@ -186,7 +188,7 @@ export function useLeaderboardRealtime() {
         }
       });
 
-    // Listen for realtime changes in data
+    // Set up data changes channel
     const dataChannel = supabase
       .channel("realtime-leaderboard")
       .on(
@@ -215,18 +217,54 @@ export function useLeaderboardRealtime() {
       )
       .subscribe();
 
+    // Handle page visibility changes for presence tracking
+    const handleVisibilityChange = () => {
+      if (user) {
+        if (document.hidden) {
+          console.log('Page hidden, untracking presence');
+          presenceChannel.untrack();
+        } else {
+          console.log('Page visible, tracking presence');
+          presenceChannel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString(),
+          });
+        }
+      }
+    };
+
+    // Handle page unload
+    const handleBeforeUnload = () => {
+      if (user) {
+        console.log('Page unloading, untracking presence');
+        presenceChannel.untrack();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      console.log('Cleaning up channels and event listeners');
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // Untrack presence before removing channels
+      if (user) {
+        presenceChannel.untrack();
+      }
+      
       supabase.removeChannel(presenceChannel);
       supabase.removeChannel(dataChannel);
     };
-  }, [onlineUsers.size]); // Re-run when online users change
+  }, [user?.id]); // Only re-run when user ID changes
 
   // Re-fetch when online users change
   useEffect(() => {
     if (users.length > 0) {
       fetchLeaderboard();
     }
-  }, [onlineUsers]);
+  }, [onlineUsers.size]);
 
   return { users, loading };
 }

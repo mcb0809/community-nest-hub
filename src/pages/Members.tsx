@@ -53,10 +53,10 @@ const Members = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  // Initialize online tracking for current user
+  // Initialize online tracking for current user (only session tracking, not presence)
   useOnlineTracking();
 
-  // Get realtime data from Supabase using the updated hook
+  // Get realtime data from Supabase using the updated hook (handles both data and presence)
   const { users: members, loading } = useLeaderboardRealtime();
 
   // Handle manual refresh/recalculation
