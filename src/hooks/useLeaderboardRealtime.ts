@@ -32,7 +32,7 @@ export function useLeaderboardRealtime() {
   
   // Use ref to track channel and prevent multiple subscriptions
   const channelRef = useRef<any>(null);
-  const isInitializedRef = useRef(false);
+  const subscriptionIdRef = useRef<string | null>(null);
 
   async function fetchLeaderboard() {
     console.log("Fetching leaderboard data...");
@@ -153,7 +153,7 @@ export function useLeaderboardRealtime() {
   // Cleanup function to safely remove channel
   const cleanupChannel = () => {
     if (channelRef.current) {
-      console.log('Cleaning up existing channel');
+      console.log('Cleaning up existing channel:', subscriptionIdRef.current);
       try {
         channelRef.current.untrack();
         supabase.removeChannel(channelRef.current);
@@ -162,31 +162,29 @@ export function useLeaderboardRealtime() {
       }
       channelRef.current = null;
     }
-    isInitializedRef.current = false;
+    subscriptionIdRef.current = null;
   };
 
   useEffect(() => {
-    // Only proceed if we have the required data and haven't initialized yet
-    if (!levelConfigs.length || !user?.id || isInitializedRef.current) {
+    // Only proceed if we have the required data and user is authenticated
+    if (!levelConfigs.length || !user?.id) {
       return;
     }
-
-    console.log("Setting up leaderboard realtime subscription for user:", user.id);
 
     // Clean up any existing channel first
     cleanupChannel();
 
-    // Mark as initialized to prevent re-initialization
-    isInitializedRef.current = true;
+    console.log("Setting up leaderboard realtime subscription for user:", user.id);
 
     // Initial fetch
     fetchLeaderboard();
     
     // Create a unique channel name to avoid conflicts
-    const channelName = `leaderboard-${user.id}-${Date.now()}`;
+    const subscriptionId = `leaderboard-${user.id}-${Date.now()}`;
+    subscriptionIdRef.current = subscriptionId;
     
     // Set up a single presence channel for tracking online users and current user presence
-    const presenceChannel = supabase.channel(channelName, {
+    const presenceChannel = supabase.channel(subscriptionId, {
       config: {
         presence: {
           key: 'user_id',
@@ -252,11 +250,12 @@ export function useLeaderboardRealtime() {
         { event: "*", schema: "public", table: "level_config" },
         (payload) => {
           console.log("Level config changed:", payload);
+          // Refetch leaderboard when level config changes to update level info realtime
           fetchLeaderboard();
         }
       )
       .subscribe(async (status) => {
-        console.log('Channel subscription status:', status);
+        console.log('Channel subscription status:', status, 'for subscription:', subscriptionId);
         if (status === 'SUBSCRIBED') {
           // Track current user's presence if authenticated
           console.log('Tracking user presence:', user.id);
@@ -269,7 +268,7 @@ export function useLeaderboardRealtime() {
 
     // Handle page visibility changes for presence tracking
     const handleVisibilityChange = () => {
-      if (channelRef.current) {
+      if (channelRef.current && subscriptionIdRef.current === subscriptionId) {
         if (document.hidden) {
           console.log('Page hidden, untracking presence');
           channelRef.current.untrack();
@@ -285,7 +284,7 @@ export function useLeaderboardRealtime() {
 
     // Handle page unload
     const handleBeforeUnload = () => {
-      if (channelRef.current) {
+      if (channelRef.current && subscriptionIdRef.current === subscriptionId) {
         console.log('Page unloading, untracking presence');
         channelRef.current.untrack();
       }
@@ -295,12 +294,16 @@ export function useLeaderboardRealtime() {
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      console.log('Cleaning up leaderboard realtime subscription');
+      console.log('Cleaning up leaderboard realtime subscription:', subscriptionId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      cleanupChannel();
+      
+      // Only cleanup if this is still the active subscription
+      if (subscriptionIdRef.current === subscriptionId) {
+        cleanupChannel();
+      }
     };
-  }, [user?.id, levelConfigs.length]); // Only depend on user ID and level configs being loaded
+  }, [user?.id, levelConfigs.length]); // Depend on user ID and level configs being loaded
 
   return { users, loading };
 }
