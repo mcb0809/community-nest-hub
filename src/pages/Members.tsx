@@ -324,6 +324,12 @@ const Members = () => {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Move XPExplanationModal to always be rendered at the end for correct stacking context */}
+      <XPExplanationModal
+        open={showXPModal}
+        onOpenChange={setShowXPModal}
+      />
     </div>
   );
 };
