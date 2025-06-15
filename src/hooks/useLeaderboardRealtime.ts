@@ -30,9 +30,12 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
   
-  // Single channel reference to prevent multiple subscriptions
-  const channelRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
+  // Single subscription management
+  const subscriptionManagerRef = useRef<{
+    channel: any;
+    isActive: boolean;
+    channelId: string;
+  } | null>(null);
 
   const fetchLeaderboard = useCallback(async () => {
     console.log("Fetching leaderboard data...");
@@ -151,46 +154,49 @@ export function useLeaderboardRealtime() {
   }, [levelConfigs, getLevelByNumber, onlineUsers]);
 
   // Cleanup function
-  const cleanupChannel = useCallback(() => {
-    if (channelRef.current) {
-      console.log("Cleaning up channel subscription");
+  const cleanupSubscription = useCallback(() => {
+    if (subscriptionManagerRef.current) {
+      console.log("Cleaning up subscription for channel:", subscriptionManagerRef.current.channelId);
       try {
-        channelRef.current.untrack?.();
-        supabase.removeChannel(channelRef.current);
+        const { channel } = subscriptionManagerRef.current;
+        if (channel) {
+          channel.untrack?.();
+          supabase.removeChannel(channel);
+        }
       } catch (error) {
-        console.warn('Error during channel cleanup:', error);
+        console.warn('Error during subscription cleanup:', error);
       }
-      channelRef.current = null;
-      isSubscribedRef.current = false;
+      subscriptionManagerRef.current = null;
     }
   }, []);
 
-  useEffect(() => {
-    // Only proceed if we have required data and user is authenticated
-    if (!levelConfigs.length || !user?.id) {
+  // Setup subscription function
+  const setupSubscription = useCallback(() => {
+    if (!user?.id || !levelConfigs.length) {
+      console.log("Cannot setup subscription - missing user or level configs");
       return;
     }
-
-    // Prevent multiple subscriptions
-    if (isSubscribedRef.current) {
-      return;
-    }
-
-    console.log("Setting up leaderboard subscription for user:", user.id);
 
     // Clean up any existing subscription first
-    cleanupChannel();
+    cleanupSubscription();
     
     // Initial fetch
     fetchLeaderboard();
     
-    // Create unique channel with timestamp to avoid conflicts
-    const channelId = `leaderboard-realtime-${Date.now()}`;
+    // Create unique channel
+    const channelId = `leaderboard-realtime-${user.id}-${Date.now()}`;
+    console.log("Setting up subscription for channel:", channelId);
+    
     const channel = supabase.channel(channelId, {
       config: { presence: { key: 'user_id' } }
     });
 
-    channelRef.current = channel;
+    // Store subscription info
+    subscriptionManagerRef.current = {
+      channel,
+      isActive: false,
+      channelId
+    };
 
     // Set up channel subscriptions
     channel
@@ -226,24 +232,31 @@ export function useLeaderboardRealtime() {
         fetchLeaderboard();
       })
       .subscribe(async (status) => {
-        console.log('Channel subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          isSubscribedRef.current = true;
-          // Track user presence
-          await channel.track({
-            user_id: user.id,
-            online_at: new Date().toISOString(),
-          });
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          isSubscribedRef.current = false;
+        console.log('Channel subscription status for', channelId, ':', status);
+        
+        if (subscriptionManagerRef.current) {
+          if (status === 'SUBSCRIBED') {
+            subscriptionManagerRef.current.isActive = true;
+            // Track user presence
+            await channel.track({
+              user_id: user.id,
+              online_at: new Date().toISOString(),
+            });
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            subscriptionManagerRef.current.isActive = false;
+          }
         }
       });
+  }, [user?.id, levelConfigs.length, fetchLeaderboard, cleanupSubscription]);
 
-    // Cleanup function for useEffect
+  useEffect(() => {
+    setupSubscription();
+    
+    // Cleanup on unmount
     return () => {
-      cleanupChannel();
+      cleanupSubscription();
     };
-  }, [user?.id, levelConfigs.length]); // Removed fetchLeaderboard from dependencies
+  }, [setupSubscription]);
 
   return { users, loading };
 }
