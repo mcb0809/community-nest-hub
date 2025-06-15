@@ -13,9 +13,18 @@ interface EventsTableProps {
   onEdit: (event: Event) => void;
   onDelete: (eventId: string) => void;
   loading?: boolean;
+  title?: string;
+  titleColor?: string;
 }
 
-const EventsTable: React.FC<EventsTableProps> = ({ events, onEdit, onDelete, loading }) => {
+const EventsTable: React.FC<EventsTableProps> = ({ 
+  events, 
+  onEdit, 
+  onDelete, 
+  loading, 
+  title = "Events Management",
+  titleColor = "text-red-400"
+}) => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showRegistrationsModal, setShowRegistrationsModal] = useState(false);
 
@@ -56,6 +65,13 @@ const EventsTable: React.FC<EventsTableProps> = ({ events, onEdit, onDelete, loa
     setSelectedEvent(null);
   };
 
+  // Check if an event is expired
+  const isEventExpired = (event: Event) => {
+    const eventDateTime = new Date(`${event.date} ${event.time}`);
+    const now = new Date();
+    return eventDateTime < now;
+  };
+
   if (loading) {
     return (
       <Card className="bg-slate-800 border-red-500/20">
@@ -70,15 +86,15 @@ const EventsTable: React.FC<EventsTableProps> = ({ events, onEdit, onDelete, loa
     <>
       <Card className="bg-slate-800 border-red-500/20">
         <CardHeader>
-          <CardTitle className="text-red-400 flex items-center gap-2">
+          <CardTitle className={`${titleColor} flex items-center gap-2`}>
             <Calendar className="w-5 h-5" />
-            Events Management ({events.length})
+            {title} ({events.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {events.length === 0 ? (
             <div className="text-center py-8 text-slate-400">
-              No events found. Create your first event!
+              {title.includes("đã kết thúc") ? "Không có sự kiện đã kết thúc" : "No events found. Create your first event!"}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -95,7 +111,12 @@ const EventsTable: React.FC<EventsTableProps> = ({ events, onEdit, onDelete, loa
                 </TableHeader>
                 <TableBody>
                   {events.map((event) => (
-                    <TableRow key={event.id} className="border-slate-700 hover:bg-slate-700/50">
+                    <TableRow 
+                      key={event.id} 
+                      className={`border-slate-700 hover:bg-slate-700/50 ${
+                        isEventExpired(event) ? 'opacity-60' : ''
+                      }`}
+                    >
                       <TableCell>
                         <div>
                           <div className="font-medium text-white">{event.title}</div>
@@ -124,6 +145,11 @@ const EventsTable: React.FC<EventsTableProps> = ({ events, onEdit, onDelete, loa
                           <Clock className="w-3 h-3" />
                           {event.time} ({event.duration}min)
                         </div>
+                        {isEventExpired(event) && (
+                          <div className="text-xs text-red-400 mt-1">
+                            Đã hết hạn
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-slate-300">

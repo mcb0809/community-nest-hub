@@ -12,6 +12,17 @@ const AdminEvents = () => {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Function to check if an event is expired
+  const isEventExpired = (event: Event) => {
+    const eventDateTime = new Date(`${event.date} ${event.time}`);
+    const now = new Date();
+    return eventDateTime < now;
+  };
+
+  // Separate events into upcoming and finished
+  const upcomingEvents = events.filter(event => !isEventExpired(event));
+  const finishedEvents = events.filter(event => isEventExpired(event));
+
   const handleCreateEvent = async (eventData: any) => {
     try {
       setIsSubmitting(true);
@@ -82,12 +93,29 @@ const AdminEvents = () => {
           isLoading={isSubmitting}
         />
       ) : (
-        <EventsTable
-          events={events}
-          onEdit={handleEditEvent}
-          onDelete={handleDeleteEvent}
-          loading={loading}
-        />
+        <div className="space-y-6">
+          {/* Upcoming Events Section */}
+          <EventsTable
+            events={upcomingEvents}
+            onEdit={handleEditEvent}
+            onDelete={handleDeleteEvent}
+            loading={loading}
+            title="Sự kiện sắp tới"
+            titleColor="text-green-400"
+          />
+
+          {/* Finished Events Section */}
+          {finishedEvents.length > 0 && (
+            <EventsTable
+              events={finishedEvents}
+              onEdit={handleEditEvent}
+              onDelete={handleDeleteEvent}
+              loading={loading}
+              title="Sự kiện đã kết thúc"
+              titleColor="text-slate-400"
+            />
+          )}
+        </div>
       )}
     </div>
   );
