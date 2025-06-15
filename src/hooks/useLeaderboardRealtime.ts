@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -29,8 +30,8 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
   
-  // Single subscription ref to track active channel
-  const subscriptionRef = useRef<any>(null);
+  // Single channel reference to prevent multiple subscriptions
+  const channelRef = useRef<any>(null);
   const isSubscribedRef = useRef(false);
 
   const fetchLeaderboard = useCallback(async () => {
@@ -150,41 +151,48 @@ export function useLeaderboardRealtime() {
   }, [levelConfigs, getLevelByNumber, onlineUsers]);
 
   // Cleanup function
-  const cleanup = useCallback(() => {
-    if (subscriptionRef.current && isSubscribedRef.current) {
+  const cleanupChannel = useCallback(() => {
+    if (channelRef.current) {
+      console.log("Cleaning up channel subscription");
       try {
-        subscriptionRef.current.untrack?.();
-        supabase.removeChannel(subscriptionRef.current);
+        channelRef.current.untrack?.();
+        supabase.removeChannel(channelRef.current);
       } catch (error) {
-        console.warn('Error during cleanup:', error);
+        console.warn('Error during channel cleanup:', error);
       }
-      subscriptionRef.current = null;
+      channelRef.current = null;
       isSubscribedRef.current = false;
     }
   }, []);
 
   useEffect(() => {
     // Only proceed if we have required data and user is authenticated
-    if (!levelConfigs.length || !user?.id || isSubscribedRef.current) {
+    if (!levelConfigs.length || !user?.id) {
+      return;
+    }
+
+    // Prevent multiple subscriptions
+    if (isSubscribedRef.current) {
       return;
     }
 
     console.log("Setting up leaderboard subscription for user:", user.id);
 
     // Clean up any existing subscription first
-    cleanup();
+    cleanupChannel();
     
     // Initial fetch
     fetchLeaderboard();
     
-    // Create unique channel
-    const channelId = `leaderboard-${user.id}-${Date.now()}`;
+    // Create unique channel with timestamp to avoid conflicts
+    const channelId = `leaderboard-realtime-${Date.now()}`;
     const channel = supabase.channel(channelId, {
       config: { presence: { key: 'user_id' } }
     });
 
-    subscriptionRef.current = channel;
+    channelRef.current = channel;
 
+    // Set up channel subscriptions
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -218,22 +226,24 @@ export function useLeaderboardRealtime() {
         fetchLeaderboard();
       })
       .subscribe(async (status) => {
-        console.log('Channel status:', status);
+        console.log('Channel subscription status:', status);
         if (status === 'SUBSCRIBED') {
           isSubscribedRef.current = true;
+          // Track user presence
           await channel.track({
             user_id: user.id,
             online_at: new Date().toISOString(),
           });
-        } else if (status === 'CLOSED') {
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           isSubscribedRef.current = false;
         }
       });
 
+    // Cleanup function for useEffect
     return () => {
-      cleanup();
+      cleanupChannel();
     };
-  }, [user?.id, levelConfigs.length, cleanup, fetchLeaderboard]);
+  }, [user?.id, levelConfigs.length]); // Simplified dependencies
 
   return { users, loading };
 }
