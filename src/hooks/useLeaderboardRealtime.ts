@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -146,17 +147,19 @@ export function useLeaderboardRealtime() {
   }
 
   useEffect(() => {
-    // Only fetch if level configs are loaded
-    if (levelConfigs.length > 0) {
-      fetchLeaderboard();
+    // Only proceed if we have the required data
+    if (!levelConfigs.length || !user?.id) {
+      return;
     }
-  }, [levelConfigs, onlineUsers.size]);
 
-  useEffect(() => {
+    // Initial fetch
     fetchLeaderboard();
     
+    // Create a unique channel name to avoid conflicts
+    const channelName = `leaderboard-${Date.now()}-${Math.random()}`;
+    
     // Set up a single presence channel for tracking online users and current user presence
-    const presenceChannel = supabase.channel('online-users', {
+    const presenceChannel = supabase.channel(channelName, {
       config: {
         presence: {
           key: 'user_id',
@@ -190,22 +193,6 @@ export function useLeaderboardRealtime() {
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
         console.log('User left:', key, leftPresences);
       })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          // Track current user's presence if authenticated
-          if (user) {
-            console.log('Tracking user presence:', user.id);
-            await presenceChannel.track({
-              user_id: user.id,
-              online_at: new Date().toISOString(),
-            });
-          }
-        }
-      });
-
-    // Set up data changes channel
-    const dataChannel = supabase
-      .channel("realtime-leaderboard")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_stats" },
@@ -238,30 +225,36 @@ export function useLeaderboardRealtime() {
           fetchLeaderboard();
         }
       )
-      .subscribe();
-
-    // Handle page visibility changes for presence tracking
-    const handleVisibilityChange = () => {
-      if (user) {
-        if (document.hidden) {
-          console.log('Page hidden, untracking presence');
-          presenceChannel.untrack();
-        } else {
-          console.log('Page visible, tracking presence');
-          presenceChannel.track({
+      .subscribe(async (status) => {
+        console.log('Channel subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          // Track current user's presence if authenticated
+          console.log('Tracking user presence:', user.id);
+          await presenceChannel.track({
             user_id: user.id,
             online_at: new Date().toISOString(),
           });
         }
+      });
+
+    // Handle page visibility changes for presence tracking
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('Page hidden, untracking presence');
+        presenceChannel.untrack();
+      } else {
+        console.log('Page visible, tracking presence');
+        presenceChannel.track({
+          user_id: user.id,
+          online_at: new Date().toISOString(),
+        });
       }
     };
 
     // Handle page unload
     const handleBeforeUnload = () => {
-      if (user) {
-        console.log('Page unloading, untracking presence');
-        presenceChannel.untrack();
-      }
+      console.log('Page unloading, untracking presence');
+      presenceChannel.untrack();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -272,22 +265,11 @@ export function useLeaderboardRealtime() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
-      // Untrack presence before removing channels
-      if (user) {
-        presenceChannel.untrack();
-      }
-      
+      // Untrack presence before removing channel
+      presenceChannel.untrack();
       supabase.removeChannel(presenceChannel);
-      supabase.removeChannel(dataChannel);
     };
-  }, [user?.id]); // Only re-run when user ID changes
-
-  // Re-fetch when online users change
-  useEffect(() => {
-    if (users.length > 0) {
-      fetchLeaderboard();
-    }
-  }, [onlineUsers.size]);
+  }, [user?.id, levelConfigs.length]); // Only depend on user ID and level configs being loaded
 
   return { users, loading };
 }
