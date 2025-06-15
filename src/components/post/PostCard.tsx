@@ -83,6 +83,12 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
     return content.replace(/\[YOUTUBE:[a-zA-Z0-9_-]{11}\]/g, '').trim();
   };
 
+  // Handle YouTube thumbnail click
+  const handleYouTubeClick = (videoId: string) => {
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    window.open(youtubeUrl, '_blank');
+  };
+
   // Get image attachments
   const getImageAttachments = () => {
     return post.attachments?.filter(att => att.type === 'file' && att.meta?.type?.startsWith('image/')) || [];
@@ -105,7 +111,11 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
         {hasYoutube && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
             {youtubeVideos.slice(0, 3).map((videoId, index) => (
-              <div key={index} className="relative group cursor-pointer">
+              <div 
+                key={index} 
+                className="relative group cursor-pointer"
+                onClick={() => handleYouTubeClick(videoId)}
+              >
                 <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden border border-slate-600 hover:border-purple-500/50 transition-all duration-300">
                   <img
                     src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
@@ -119,6 +129,9 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
                     <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
                       <Play className="w-5 h-5 text-white ml-1" />
                     </div>
+                  </div>
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink className="w-4 h-4 text-white" />
                   </div>
                 </div>
                 {youtubeVideos.length > 3 && index === 2 && (
