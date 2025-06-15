@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -88,11 +89,12 @@ const sendRegistrationWebhook = async (
     console.log('Webhook URL:', webhookUrl);
     console.log('Credentials generated successfully');
     
+    // Format the payload to match backend expectations
     const payload = {
       user_name: userName || '',
       user_email: userEmail || '',
       event_title: event.title || '',
-      event_time: `${event.date} ${event.time}` || '',
+      event_time: `${event.date} ${event.time}`,
       event_id: event.id || '',
       user_id: userId || '',
       registered_at: new Date().toISOString()
