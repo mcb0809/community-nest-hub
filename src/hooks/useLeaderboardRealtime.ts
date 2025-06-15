@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -33,8 +34,12 @@ export function useLeaderboardRealtime() {
   const subscriptionRef = useRef<any>(null);
   const isSubscribedRef = useRef(false);
 
-  const fetchLeaderboard = useCallback(async () => {
+  // Stable fetchLeaderboard function that doesn't depend on onlineUsers
+  const fetchLeaderboard = useCallback(async (currentOnlineUsers?: Set<string>) => {
     console.log("Fetching leaderboard data...");
+    
+    // Use the passed onlineUsers or current state
+    const onlineUsersToUse = currentOnlineUsers || onlineUsers;
     
     try {
       // Get user profiles data
@@ -126,7 +131,7 @@ export function useLeaderboardRealtime() {
           coursesCompleted: userStats?.courses_completed || 0,
           streak: userStats?.current_streak || 0,
           badges: [], // Will be implemented with badge system later
-          isOnline: onlineUsers.has(profile.id), // Check if user is in online users set
+          isOnline: onlineUsersToUse.has(profile.id), // Use the passed online users
           joinDate: profile.created_at || new Date().toISOString(),
           title: undefined, // Can be set based on achievements later
           postsCount: postsCounts[profile.id] || 0,
@@ -147,7 +152,7 @@ export function useLeaderboardRealtime() {
       setUsers([]);
       setLoading(false);
     }
-  }, [levelConfigs, getLevelByNumber, onlineUsers]);
+  }, [levelConfigs, getLevelByNumber]); // Remove onlineUsers from dependencies
 
   // Cleanup function
   const cleanupSubscription = useCallback(() => {
@@ -202,6 +207,8 @@ export function useLeaderboardRealtime() {
           });
         });
         setOnlineUsers(onlineUserIds);
+        // Re-fetch with updated online users
+        fetchLeaderboard(onlineUserIds);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
         console.log('User joined:', key, newPresences);
@@ -240,7 +247,7 @@ export function useLeaderboardRealtime() {
     return () => {
       cleanupSubscription();
     };
-  }, [user?.id, levelConfigs.length]); // Only depend on stable values
+  }, [user?.id, levelConfigs.length, fetchLeaderboard, cleanupSubscription]); // Include stable dependencies
 
   return { users, loading };
 }
