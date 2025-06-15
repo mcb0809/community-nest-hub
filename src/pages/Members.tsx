@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
@@ -19,6 +18,7 @@ import { ChevronDown } from "lucide-react";
 import { Card, CardContent } from '@/components/ui/card';
 import { useLeaderboardRealtime, recalculateUserStats } from '@/hooks/useLeaderboardRealtime';
 import { useToast } from '@/hooks/use-toast';
+import { useOnlineTracking } from '@/hooks/useOnlineTracking';
 
 const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
 
@@ -53,7 +53,10 @@ const Members = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  // Get realtime data from Supabase using the updated view
+  // Initialize online tracking for current user
+  useOnlineTracking();
+
+  // Get realtime data from Supabase using the updated hook
   const { users: members, loading } = useLeaderboardRealtime();
 
   // Handle manual refresh/recalculation

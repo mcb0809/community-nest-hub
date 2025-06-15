@@ -21,6 +21,7 @@ export interface LeaderboardUser {
 export function useLeaderboardRealtime() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
   async function fetchLeaderboard() {
     console.log("Fetching leaderboard data...");
@@ -114,7 +115,7 @@ export function useLeaderboardRealtime() {
           coursesCompleted: userStats?.courses_completed || 0,
           streak: userStats?.current_streak || 0,
           badges: [], // Will be implemented with badge system later
-          isOnline: false, // Will be implemented with real-time presence later
+          isOnline: onlineUsers.has(profile.id), // Check if user is in online users set
           joinDate: profile.created_at || new Date().toISOString(),
           title: undefined, // Can be set based on achievements later
           postsCount: postsCounts[profile.id] || 0,
@@ -137,8 +138,56 @@ export function useLeaderboardRealtime() {
   useEffect(() => {
     fetchLeaderboard();
     
-    // Listen for realtime changes
-    const channel = supabase
+    // Set up presence tracking channel
+    const presenceChannel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: 'user_id',
+        },
+      },
+    });
+
+    // Listen for presence sync events
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        console.log('Presence sync:', state);
+        
+        // Extract user IDs from presence state
+        const onlineUserIds = new Set<string>();
+        Object.keys(state).forEach(key => {
+          const presences = state[key];
+          presences.forEach((presence: any) => {
+            if (presence.user_id) {
+              onlineUserIds.add(presence.user_id);
+            }
+          });
+        });
+        
+        console.log('Online users:', onlineUserIds);
+        setOnlineUsers(onlineUserIds);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('User joined:', key, newPresences);
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('User left:', key, leftPresences);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Track current user's presence if authenticated
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await presenceChannel.track({
+              user_id: user.id,
+              online_at: new Date().toISOString(),
+            });
+          }
+        }
+      });
+
+    // Listen for realtime changes in data
+    const dataChannel = supabase
       .channel("realtime-leaderboard")
       .on(
         "postgres_changes",
@@ -167,9 +216,17 @@ export function useLeaderboardRealtime() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(dataChannel);
     };
-  }, []);
+  }, [onlineUsers.size]); // Re-run when online users change
+
+  // Re-fetch when online users change
+  useEffect(() => {
+    if (users.length > 0) {
+      fetchLeaderboard();
+    }
+  }, [onlineUsers]);
 
   return { users, loading };
 }

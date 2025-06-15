@@ -7,6 +7,7 @@ export const useOnlineTracking = () => {
   const { user } = useAuth();
   const sessionStartRef = useRef<Date | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const presenceChannelRef = useRef<any>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -23,21 +24,52 @@ export const useOnlineTracking = () => {
     // Handle daily login check
     handleDailyLogin();
 
+    // Set up presence channel for online tracking
+    presenceChannelRef.current = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: 'user_id',
+        },
+      },
+    });
+
+    presenceChannelRef.current.subscribe(async (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        // Track user presence
+        await presenceChannelRef.current.track({
+          user_id: user.id,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+
     // Handle page visibility changes
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // User went away - log session time
+        // User went away - log session time and untrack presence
         logSessionTime();
+        if (presenceChannelRef.current) {
+          presenceChannelRef.current.untrack();
+        }
       } else {
-        // User came back - restart session
+        // User came back - restart session and track presence again
         sessionStartRef.current = new Date();
         updateLastActivity();
+        if (presenceChannelRef.current) {
+          presenceChannelRef.current.track({
+            user_id: user.id,
+            online_at: new Date().toISOString(),
+          });
+        }
       }
     };
 
     // Handle page unload
     const handleBeforeUnload = () => {
       logSessionTime();
+      if (presenceChannelRef.current) {
+        presenceChannelRef.current.untrack();
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -51,8 +83,12 @@ export const useOnlineTracking = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
-      // Log final session time
+      // Log final session time and untrack presence
       logSessionTime();
+      if (presenceChannelRef.current) {
+        presenceChannelRef.current.untrack();
+        supabase.removeChannel(presenceChannelRef.current);
+      }
     };
   }, [user]);
 
