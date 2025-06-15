@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -30,10 +29,9 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
   
-  // Use refs to track subscription state and prevent multiple subscriptions
-  const channelRef = useRef<any>(null);
+  // Single subscription ref to track active channel
+  const subscriptionRef = useRef<any>(null);
   const isSubscribedRef = useRef(false);
-  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchLeaderboard = useCallback(async () => {
     console.log("Fetching leaderboard data...");
@@ -151,67 +149,45 @@ export function useLeaderboardRealtime() {
     }
   }, [levelConfigs, getLevelByNumber, onlineUsers]);
 
-  // Cleanup function to safely remove channel
-  const cleanupChannel = useCallback(() => {
-    if (cleanupTimeoutRef.current) {
-      clearTimeout(cleanupTimeoutRef.current);
-      cleanupTimeoutRef.current = null;
-    }
-
-    if (channelRef.current && isSubscribedRef.current) {
-      console.log('Cleaning up existing channel');
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (subscriptionRef.current && isSubscribedRef.current) {
       try {
-        channelRef.current.untrack();
-        supabase.removeChannel(channelRef.current);
+        subscriptionRef.current.untrack?.();
+        supabase.removeChannel(subscriptionRef.current);
       } catch (error) {
-        console.warn('Error cleaning up channel:', error);
+        console.warn('Error during cleanup:', error);
       }
-      channelRef.current = null;
+      subscriptionRef.current = null;
       isSubscribedRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    // Only proceed if we have the required data and user is authenticated
-    if (!levelConfigs.length || !user?.id) {
+    // Only proceed if we have required data and user is authenticated
+    if (!levelConfigs.length || !user?.id || isSubscribedRef.current) {
       return;
     }
 
-    // Prevent multiple subscriptions by checking if already subscribed
-    if (isSubscribedRef.current && channelRef.current) {
-      return;
-    }
+    console.log("Setting up leaderboard subscription for user:", user.id);
 
-    // Clean up any existing channel first
-    cleanupChannel();
-
-    console.log("Setting up leaderboard realtime subscription for user:", user.id);
-
+    // Clean up any existing subscription first
+    cleanup();
+    
     // Initial fetch
     fetchLeaderboard();
     
-    // Create a unique channel name to avoid conflicts
-    const channelName = `leaderboard-presence-${user.id}-${Date.now()}`;
-    
-    // Set up a single presence channel for tracking online users and current user presence
-    const presenceChannel = supabase.channel(channelName, {
-      config: {
-        presence: {
-          key: 'user_id',
-        },
-      },
+    // Create unique channel
+    const channelId = `leaderboard-${user.id}-${Date.now()}`;
+    const channel = supabase.channel(channelId, {
+      config: { presence: { key: 'user_id' } }
     });
 
-    // Store channel reference before subscribing
-    channelRef.current = presenceChannel;
+    subscriptionRef.current = channel;
 
-    // Listen for presence sync events
-    presenceChannel
+    channel
       .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        console.log('Presence sync:', state);
-        
-        // Extract user IDs from presence state
+        const state = channel.presenceState();
         const onlineUserIds = new Set<string>();
         Object.keys(state).forEach(key => {
           const presences = state[key];
@@ -221,8 +197,6 @@ export function useLeaderboardRealtime() {
             }
           });
         });
-        
-        console.log('Online users:', onlineUserIds);
         setOnlineUsers(onlineUserIds);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
@@ -231,46 +205,23 @@ export function useLeaderboardRealtime() {
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
         console.log('User left:', key, leftPresences);
       })
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "user_stats" },
-        (payload) => {
-          console.log("User stats changed:", payload);
-          fetchLeaderboard();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "xp_logs" },
-        (payload) => {
-          console.log("XP logs changed:", payload);
-          fetchLeaderboard();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "posts" },
-        (payload) => {
-          console.log("Posts changed:", payload);
-          fetchLeaderboard();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "level_config" },
-        (payload) => {
-          console.log("Level config changed:", payload);
-          // Refetch leaderboard when level config changes to update level info realtime
-          fetchLeaderboard();
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, () => {
+        fetchLeaderboard();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "xp_logs" }, () => {
+        fetchLeaderboard();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
+        fetchLeaderboard();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "level_config" }, () => {
+        fetchLeaderboard();
+      })
       .subscribe(async (status) => {
-        console.log('Channel subscription status:', status, 'for channel:', channelName);
+        console.log('Channel status:', status);
         if (status === 'SUBSCRIBED') {
           isSubscribedRef.current = true;
-          // Track current user's presence if authenticated
-          console.log('Tracking user presence:', user.id);
-          await presenceChannel.track({
+          await channel.track({
             user_id: user.id,
             online_at: new Date().toISOString(),
           });
@@ -279,44 +230,10 @@ export function useLeaderboardRealtime() {
         }
       });
 
-    // Handle page visibility changes for presence tracking
-    const handleVisibilityChange = () => {
-      if (channelRef.current && isSubscribedRef.current) {
-        if (document.hidden) {
-          console.log('Page hidden, untracking presence');
-          channelRef.current.untrack();
-        } else {
-          console.log('Page visible, tracking presence');
-          channelRef.current.track({
-            user_id: user.id,
-            online_at: new Date().toISOString(),
-          });
-        }
-      }
-    };
-
-    // Handle page unload
-    const handleBeforeUnload = () => {
-      if (channelRef.current && isSubscribedRef.current) {
-        console.log('Page unloading, untracking presence');
-        channelRef.current.untrack();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
     return () => {
-      console.log('Cleaning up leaderboard realtime subscription for channel:', channelName);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      
-      // Delay cleanup slightly to prevent race conditions
-      cleanupTimeoutRef.current = setTimeout(() => {
-        cleanupChannel();
-      }, 100);
+      cleanup();
     };
-  }, [user?.id, levelConfigs.length, cleanupChannel, fetchLeaderboard]); // Depend on user ID and level configs being loaded
+  }, [user?.id, levelConfigs.length, cleanup, fetchLeaderboard]);
 
   return { users, loading };
 }
