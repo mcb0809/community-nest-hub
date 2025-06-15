@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -29,171 +28,132 @@ export function useLeaderboardRealtime() {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
-  
-  // Single subscription reference to prevent multiple subscriptions
-  const subscriptionRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
 
-  // Stable fetchLeaderboard function that doesn't depend on onlineUsers
-  const fetchLeaderboard = useCallback(async (currentOnlineUsers?: Set<string>) => {
-    console.log("Fetching leaderboard data...");
-    
-    // Use the passed onlineUsers or current state
-    const onlineUsersToUse = currentOnlineUsers || onlineUsers;
-    
-    try {
-      // Get user profiles data
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("user_profiles")
-        .select(`
-          id,
-          display_name,
-          avatar_url,
-          email,
-          created_at
-        `);
-      
-      if (profilesError) {
-        console.error("Error fetching user profiles:", profilesError);
-        setLoading(false);
-        return;
-      }
+  // Dùng ref để tránh tạo lại channel nhiều lần
+  const channelRef = useRef<any>(null);
 
-      console.log("User profiles data:", profilesData);
+  // Hàm lấy bảng xếp hạng, không phụ thuộc onlineUsers (để tránh useEffect lặp)
+  const fetchLeaderboard = useCallback(
+    async (currentOnlineUsers?: Set<string>) => {
+      const onlineSet = currentOnlineUsers || onlineUsers; // dùng onlineUsers truyền vào nếu có
+      setLoading(true);
 
-      // Get user stats separately
-      const { data: statsData, error: statsError } = await supabase
-        .from("user_stats")
-        .select("*");
-
-      if (statsError) {
-        console.warn("Error fetching user stats:", statsError);
-      }
-
-      console.log("User stats data:", statsData);
-
-      // Get posts count for each user
-      const { data: postsData, error: postsError } = await supabase
-        .from("posts")
-        .select("user_id")
-        .eq("visibility", "public");
-
-      if (postsError) {
-        console.warn("Error fetching posts:", postsError);
-      }
-
-      // Count posts by user
-      const postsCounts: Record<string, number> = {};
-      if (postsData) {
-        postsData.forEach(post => {
-          if (post.user_id) {
-            postsCounts[post.user_id] = (postsCounts[post.user_id] || 0) + 1;
-          }
-        });
-      }
-
-      console.log("Posts counts:", postsCounts);
-
-      // Combine all data with level information
-      const mapped: LeaderboardUser[] = (profilesData || []).map((profile: any) => {
-        const userStats = statsData?.find(s => s.user_id === profile.id);
-        const totalXp = userStats?.total_xp || 0;
-        const level = userStats?.level || 1;
-        
-        // Get level config for this level
-        const levelConfig = getLevelByNumber(level);
-        
-        // Calculate level progress using level configs
-        const calculateLevelProgress = (xp: number, currentLevel: number) => {
-          if (!levelConfigs.length) return 0;
-          
-          const currentLevelConfig = getLevelByNumber(currentLevel);
-          const nextLevelConfig = getLevelByNumber(currentLevel + 1);
-          
-          if (!currentLevelConfig) return 0;
-          if (!nextLevelConfig) return 100; // Max level reached
-          
-          const currentLevelXp = currentLevelConfig.required_xp;
-          const nextLevelXp = nextLevelConfig.required_xp;
-          const progressXp = Math.max(0, xp - currentLevelXp);
-          const requiredXp = nextLevelXp - currentLevelXp;
-          
-          return Math.min(100, Math.max(0, Math.round((progressXp / requiredXp) * 100)));
-        };
-
-        return {
-          id: profile.id,
-          name: profile.display_name || 'Anonymous',
-          avatar: profile.avatar_url,
-          xp: totalXp,
-          level: level,
-          levelProgress: calculateLevelProgress(totalXp, level),
-          coursesCompleted: userStats?.courses_completed || 0,
-          streak: userStats?.current_streak || 0,
-          badges: [], // Will be implemented with badge system later
-          isOnline: onlineUsersToUse.has(profile.id), // Use the passed online users
-          joinDate: profile.created_at || new Date().toISOString(),
-          title: undefined, // Can be set based on achievements later
-          postsCount: postsCounts[profile.id] || 0,
-          levelName: levelConfig?.level_name,
-          levelColor: levelConfig?.color,
-          levelIcon: levelConfig?.icon,
-        };
-      });
-
-      // Sort by XP descending
-      mapped.sort((a, b) => b.xp - a.xp);
-      
-      console.log("Final mapped leaderboard users:", mapped);
-      setUsers(mapped);
-      setLoading(false);
-    } catch (error) {
-      console.error("Unexpected error fetching leaderboard:", error);
-      setUsers([]);
-      setLoading(false);
-    }
-  }, [levelConfigs, getLevelByNumber]); // Remove onlineUsers from dependencies
-
-  // Cleanup function
-  const cleanupSubscription = useCallback(() => {
-    if (subscriptionRef.current) {
-      console.log("Cleaning up existing subscription");
       try {
-        subscriptionRef.current.untrack?.();
-        supabase.removeChannel(subscriptionRef.current);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("user_profiles")
+          .select(`
+            id,
+            display_name,
+            avatar_url,
+            email,
+            created_at
+          `);
+
+        if (profilesError) {
+          setLoading(false);
+          return;
+        }
+
+        const { data: statsData } = await supabase
+          .from("user_stats")
+          .select("*");
+
+        const { data: postsData } = await supabase
+          .from("posts")
+          .select("user_id")
+          .eq("visibility", "public");
+
+        // Count posts by user
+        const postsCounts: Record<string, number> = {};
+        if (postsData) {
+          postsData.forEach(post => {
+            if (post.user_id) {
+              postsCounts[post.user_id] = (postsCounts[post.user_id] || 0) + 1;
+            }
+          });
+        }
+
+        // Map data to LeaderboardUser
+        const mapped: LeaderboardUser[] = (profilesData || []).map((profile: any) => {
+          const userStats = statsData?.find(s => s.user_id === profile.id);
+          const totalXp = userStats?.total_xp || 0;
+          const level = userStats?.level || 1;
+          const levelConfig = getLevelByNumber(level);
+
+          // Level progress từ config (dùng lại code cũ đảm bảo)
+          const calculateLevelProgress = (xp: number, currentLevel: number) => {
+            if (!levelConfigs.length) return 0;
+            const currentLevelConfig = getLevelByNumber(currentLevel);
+            const nextLevelConfig = getLevelByNumber(currentLevel + 1);
+            if (!currentLevelConfig) return 0;
+            if (!nextLevelConfig) return 100;
+            const currentLevelXp = currentLevelConfig.required_xp;
+            const nextLevelXp = nextLevelConfig.required_xp;
+            const progressXp = Math.max(0, xp - currentLevelXp);
+            const requiredXp = nextLevelXp - currentLevelXp;
+            return Math.min(100, Math.max(0, Math.round((progressXp / requiredXp) * 100)));
+          };
+
+          return {
+            id: profile.id,
+            name: profile.display_name || 'Anonymous',
+            avatar: profile.avatar_url,
+            xp: totalXp,
+            level: level,
+            levelProgress: calculateLevelProgress(totalXp, level),
+            coursesCompleted: userStats?.courses_completed ?? 0,
+            streak: userStats?.current_streak ?? 0,
+            badges: [],
+            isOnline: onlineSet.has(profile.id),
+            joinDate: profile.created_at || new Date().toISOString(),
+            title: undefined,
+            postsCount: postsCounts[profile.id] || 0,
+            levelName: levelConfig?.level_name,
+            levelColor: levelConfig?.color,
+            levelIcon: levelConfig?.icon,
+          };
+        });
+
+        mapped.sort((a, b) => b.xp - a.xp);
+
+        setUsers(mapped);
+        setLoading(false);
       } catch (error) {
-        console.warn('Error during subscription cleanup:', error);
+        setUsers([]);
+        setLoading(false);
       }
-      subscriptionRef.current = null;
-      isSubscribedRef.current = false;
+    },
+    [levelConfigs, getLevelByNumber] // Không thêm onlineUsers vào dependencies
+  );
+
+  // Cleanup channel đúng chuẩn
+  const cleanupChannel = useCallback(() => {
+    if (channelRef.current) {
+      try {
+        // untrack nếu có
+        channelRef.current.untrack?.();
+        supabase.removeChannel(channelRef.current);
+      } catch {}
+      channelRef.current = null;
     }
   }, []);
 
+  // Main effect chỉ tạo và cleanup channel 1 lần theo user.id và levelConfigs
   useEffect(() => {
-    // Only setup subscription once when user and level configs are available
-    if (!user?.id || !levelConfigs.length || isSubscribedRef.current) {
-      return;
-    }
+    // Nếu không đủ dữ liệu, hoặc channel đã được tạo, thoát
+    if (!user?.id || !levelConfigs.length) return;
 
-    console.log("Setting up leaderboard subscription for user:", user.id);
+    // Cleanup bất kỳ channel cũ
+    cleanupChannel();
 
-    // Clean up any existing subscription first
-    cleanupSubscription();
-    
-    // Initial fetch
-    fetchLeaderboard();
-    
-    // Create unique channel
+    // Tạo channel mới (unique cho user)
     const channelId = `leaderboard-realtime-${user.id}-${Date.now()}`;
-    console.log("Creating channel:", channelId);
-    
-    const channel = supabase.channel(channelId, {
-      config: { presence: { key: 'user_id' } }
-    });
+    const channel = supabase.channel(channelId, { config: { presence: { key: 'user_id' } } });
+    channelRef.current = channel;
 
-    subscriptionRef.current = channel;
+    fetchLeaderboard(); // Lần đầu fetch
 
-    // Set up channel subscriptions
+    // Đăng ký sự kiện
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -201,20 +161,11 @@ export function useLeaderboardRealtime() {
         Object.keys(state).forEach(key => {
           const presences = state[key];
           presences.forEach((presence: any) => {
-            if (presence.user_id) {
-              onlineUserIds.add(presence.user_id);
-            }
+            if (presence.user_id) onlineUserIds.add(presence.user_id);
           });
         });
-        setOnlineUsers(onlineUserIds);
-        // Re-fetch with updated online users
+        setOnlineUsers(onlineUserIds); // cập nhật
         fetchLeaderboard(onlineUserIds);
-      })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('User joined:', key, newPresences);
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('User left:', key, leftPresences);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, () => {
         fetchLeaderboard();
@@ -229,25 +180,19 @@ export function useLeaderboardRealtime() {
         fetchLeaderboard();
       })
       .subscribe(async (status) => {
-        console.log('Channel subscription status:', status);
-        
         if (status === 'SUBSCRIBED') {
-          isSubscribedRef.current = true;
-          // Track user presence
           await channel.track({
             user_id: user.id,
-            online_at: new Date().toISOString(),
+            online_at: new Date().toISOString()
           });
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          isSubscribedRef.current = false;
         }
       });
 
-    // Cleanup on unmount
     return () => {
-      cleanupSubscription();
+      // cleanup mọi thứ khi user/id đổi hoặc unmount
+      cleanupChannel();
     };
-  }, [user?.id, levelConfigs.length, fetchLeaderboard, cleanupSubscription]); // Include stable dependencies
+  }, [user?.id, levelConfigs.length, fetchLeaderboard, cleanupChannel]);
 
   return { users, loading };
 }
