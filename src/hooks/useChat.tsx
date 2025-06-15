@@ -167,7 +167,7 @@ export const useChat = (channelId?: string) => {
 
       console.log('Adding new message to state:', newMessage);
 
-      // Add new message to existing messages instead of refetching all
+      // Add new message to existing messages
       setMessages(prev => {
         // Check if message already exists to avoid duplicates
         if (prev.some(msg => msg.id === newMessage.id)) {
@@ -179,7 +179,8 @@ export const useChat = (channelId?: string) => {
         return updated;
       });
       
-      scrollToBottom();
+      // Force scroll to bottom after state update
+      setTimeout(scrollToBottom, 50);
     } else if (payload.eventType === 'UPDATE') {
       setMessages(prev => prev.map(msg => 
         msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
@@ -201,7 +202,7 @@ export const useChat = (channelId?: string) => {
       console.log('Setting up realtime subscription for channel:', targetChannelId);
       
       const messageChannel = supabase
-        .channel(`public:messages:${targetChannelId}`)
+        .channel(`messages_${targetChannelId}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'messages', filter: `channel_id=eq.${targetChannelId}` },
@@ -223,10 +224,31 @@ export const useChat = (channelId?: string) => {
 
     const targetChannelId = channelId || selectedChannel;
     setSending(true);
+    
     try {
       console.log('Sending message to channel:', targetChannelId);
       
-      // Send message
+      // Create optimistic message first
+      const optimisticMessage: Message = {
+        id: `temp-${Date.now()}`,
+        content: content.trim(),
+        user_id: user.id,
+        channel_id: targetChannelId,
+        created_at: new Date().toISOString(),
+        reactions: {},
+        reply_to: replyTo || null,
+        user_profiles: {
+          display_name: user.email || 'Unknown User',
+          avatar_url: undefined
+        },
+        message_attachments: []
+      };
+
+      // Add optimistic message to UI immediately
+      setMessages(prev => [...prev, optimisticMessage]);
+      scrollToBottom();
+      
+      // Send message to server
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert([{
@@ -238,7 +260,21 @@ export const useChat = (channelId?: string) => {
         .select()
         .single();
 
-      if (messageError) throw messageError;
+      if (messageError) {
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+        throw messageError;
+      }
+
+      // Replace optimistic message with real message
+      setMessages(prev => prev.map(msg => 
+        msg.id === optimisticMessage.id ? {
+          ...messageData,
+          reactions: messageData.reactions || {},
+          user_profiles: optimisticMessage.user_profiles,
+          message_attachments: []
+        } : msg
+      ));
 
       console.log('Message sent successfully:', messageData);
       
@@ -281,7 +317,6 @@ export const useChat = (channelId?: string) => {
         await Promise.all(uploadPromises);
       }
 
-      // The real-time subscription will handle adding the message to the UI
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
