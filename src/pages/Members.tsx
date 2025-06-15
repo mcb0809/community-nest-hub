@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,13 +13,31 @@ import {
 } from 'lucide-react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
+import XPExplanationModal from "@/components/members/XPExplanationModal";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { ChevronDown } from "lucide-react";
 
-const Members = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
+const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
 
-  // Mock data với hệ thống gamification
-  const members = [
+function getLevel(xp: number) {
+  let level = 1, acc = 0;
+  for (let i = 0; i < levelThresholds.length; i++) {
+    acc += levelThresholds[i];
+    if (xp < acc) {
+      return {
+        level: i + 1,
+        progress: Math.round((xp - (acc - levelThresholds[i])) * 100 / levelThresholds[i]),
+        maxXp: acc,
+      };
+    }
+  }
+  return { level: 10, progress: 100, maxXp: acc };
+}
+
+// Định nghĩa hàm tính dữ liệu leaderboard: nhận logs, trả về user info với xp, level, streak...
+function getLeaderboardData() {
+  // Dữ liệu bên dưới nên lấy từ backend thực, đây đang mock để dùng thử
+  const membersData = [
     {
       id: '1',
       name: 'Hoàng Minh',
@@ -145,27 +162,70 @@ const Members = () => {
       isOnline: true
     }
   ];
+  // Giả sử mỗi member đã có xp → tính level, progress %
+  return membersData.map(mem => {
+    const lv = getLevel(mem.xp);
+    return { ...mem, level: lv.level, maxXp: lv.maxXp, levelProgress: lv.progress };
+  });
+}
 
+const filterOptions = [
+  { value: 'all', label: 'Tất cả', icon: Trophy },
+  { value: 'top10', label: 'Top 10', icon: Crown },
+  { value: 'online', label: 'Đang online', icon: TrendingUp },
+  { value: 'streak', label: 'Streak cao', icon: Zap },
+];
+
+// Bộ lọc thêm
+const extraFilters = [
+  { value: 'level', label: 'Level', options: Array.from({ length: 10 }, (_, i) => i + 1) },
+  { value: 'streak', label: 'Streak 7+', options: [] },
+  { value: 'xp', label: 'XP 10k+', options: [] },
+];
+
+const Members = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [showXPModal, setShowXPModal] = useState(false);
+  const [levelFilter, setLevelFilter] = useState<number | null>(null);
+
+  // Sử dụng getLeaderboardData() thay cho mảng members
+  const members = getLeaderboardData();
+
+  // Bổ sung lọc theo Level
   const filteredMembers = members.filter(member => {
     const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
       (filterType === 'top10' && member.rank <= 10) ||
       (filterType === 'online' && member.isOnline) ||
       (filterType === 'streak' && member.streak >= 20);
-    return matchesSearch && matchesFilter;
+    const matchesLevel = levelFilter ? member.level === levelFilter : true;
+    return matchesSearch && matchesFilter && matchesLevel;
   });
-
-  const filterOptions = [
-    { value: 'all', label: 'Tất cả', icon: Trophy },
-    { value: 'top10', label: 'Top 10', icon: Crown },
-    { value: 'online', label: 'Đang online', icon: TrendingUp },
-    { value: 'streak', label: 'Streak cao', icon: Zap },
-  ];
 
   return (
     <div className="space-y-8">
       {/* Gamification Header */}
       <LeaderboardHeader />
+
+      {/* Section Highlight Tuần này */}
+      <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+        <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-400/20 to-purple-500/20 rounded-xl py-3 px-4">
+          <Trophy className="w-5 h-5 text-yellow-400" />
+          <span className="text-white font-semibold">Hoàng Minh</span>
+          <span className="text-sm text-slate-400">– Hoàn thành 5 khóa học</span>
+        </div>
+        <div className="flex items-center gap-2 bg-gradient-to-r from-green-400/20 to-cyan-500/20 rounded-xl py-3 px-4">
+          <Zap className="w-5 h-5 text-green-400" />
+          <span className="text-white font-semibold">Lan Anh</span>
+          <span className="text-sm text-slate-400">– 30 ngày streak</span>
+        </div>
+        <div className="flex items-center gap-2 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-xl py-3 px-4">
+          <Crown className="w-5 h-5 text-purple-400" />
+          <span className="text-white font-semibold">Đức Thành</span>
+          <span className="text-sm text-slate-400">– Top 1 điểm số tháng</span>
+        </div>
+      </div>
 
       {/* Search and Filters */}
       <Card className="glass-card border-slate-700/50">
@@ -180,7 +240,6 @@ const Members = () => {
                 className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-purple-500"
               />
             </div>
-            
             <div className="flex gap-2 flex-wrap">
               {filterOptions.map((option) => (
                 <Button
@@ -197,6 +256,36 @@ const Members = () => {
                   {option.label}
                 </Button>
               ))}
+              {/* Bộ lọc theo Level */}
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-1 border-slate-600 text-slate-300 px-3"
+                  onClick={() => setLevelFilter(levelFilter ? null : 1)}
+                >
+                  Lọc Level
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+                {levelFilter !== null && (
+                  <div className="absolute bg-slate-900 rounded shadow-md mt-1 z-10">
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <div key={i} className="px-4 py-2 hover:bg-purple-500/20 cursor-pointer text-white"
+                        onClick={() => setLevelFilter(i + 1)}>
+                        Level {i + 1}
+                      </div>
+                    ))}
+                    <div className="px-4 py-2 text-slate-400 cursor-pointer" onClick={() => setLevelFilter(null)}>Bỏ lọc</div>
+                  </div>
+                )}
+              </div>
+              {/* Nút mở Modal XP */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-1 border-slate-600 text-slate-300 px-3"
+                onClick={() => setShowXPModal(true)}
+              >
+                🔎 XP là gì?
+              </Button>
             </div>
           </div>
         </CardContent>

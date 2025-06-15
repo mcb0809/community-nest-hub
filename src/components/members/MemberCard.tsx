@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +12,7 @@ import {
   Calendar,
   Target
 } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 interface MemberStats {
   id: string;
@@ -138,24 +138,40 @@ const MemberCard = ({ member, index }: MemberCardProps) => {
 
         {/* Badges */}
         {member.badges.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center">
-              <Award className="w-4 h-4 mr-2 text-slate-400" />
-              <span className="text-sm font-medium text-slate-300">Huy hiệu</span>
+          <TooltipProvider>
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Award className="w-4 h-4 mr-2 text-slate-400" />
+                <span className="text-sm font-medium text-slate-300">Huy hiệu</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {member.badges.slice(0, 3).map((badge, bidx) => (
+                  <Tooltip key={bidx}>
+                    <TooltipTrigger asChild>
+                      <Badge variant="outline" className="text-xs border-slate-600 text-slate-300 cursor-pointer">
+                        {badge}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span>{badge === "Master Learner"
+                        ? "Hoàn thành 20+ khóa học"
+                        : badge === "Streak King"
+                        ? "Streak 30+ ngày liên tiếp"
+                        : badge === "Course Crusher"
+                        ? "Hoàn thành 10+ khóa học"
+                        : badge}
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+                {member.badges.length > 3 && (
+                  <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">
+                    +{member.badges.length - 3}
+                  </Badge>
+                )}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {member.badges.slice(0, 3).map((badge, index) => (
-                <Badge key={index} variant="outline" className="text-xs border-slate-600 text-slate-300">
-                  {badge}
-                </Badge>
-              ))}
-              {member.badges.length > 3 && (
-                <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">
-                  +{member.badges.length - 3}
-                </Badge>
-              )}
-            </div>
-          </div>
+          </TooltipProvider>
         )}
       </CardContent>
     </Card>
