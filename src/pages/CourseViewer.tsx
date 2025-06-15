@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,8 +18,11 @@ import { useToast } from '@/hooks/use-toast';
 import { createSlug, extractIdFromSlug } from '@/utils/slugUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
+import { useLessonProgress } from '@/hooks/useLessonProgress';
 import AuthRequiredModal from '@/components/auth/AuthRequiredModal';
 import CommentsSection from '@/components/course/CommentsSection';
+import LessonCompletionButton from '@/components/course/LessonCompletionButton';
+import CourseProgressBar from '@/components/course/CourseProgressBar';
 
 interface Course {
   id: string;
@@ -61,6 +63,15 @@ const CourseViewer = () => {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // Use lesson progress hook
+  const {
+    courseProgress,
+    markLessonCompleted,
+    isLessonCompleted,
+    getCourseCompletionPercentage,
+    isCourseCompleted
+  } = useLessonProgress(course?.id);
 
   useEffect(() => {
     const identifier = courseId || extractIdFromSlug(slug || '') || slug;
@@ -153,6 +164,14 @@ const CourseViewer = () => {
       return;
     }
     setCurrentLesson(lesson);
+  };
+
+  const handleMarkLessonCompleted = async (lessonId: string) => {
+    if (!isAuthenticated) {
+      requireAuth();
+      return;
+    }
+    await markLessonCompleted(lessonId);
   };
 
   const extractYouTubeVideoId = (url: string) => {
@@ -258,11 +277,19 @@ const CourseViewer = () => {
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <h2 className="text-2xl font-bold text-white">{currentLesson.title}</h2>
-                      {currentLesson.is_preview && (
-                        <Badge variant="outline" className="border-green-500/30 text-green-400">
-                          Preview
-                        </Badge>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {currentLesson.is_preview && (
+                          <Badge variant="outline" className="border-green-500/30 text-green-400">
+                            Preview
+                          </Badge>
+                        )}
+                        {isLessonCompleted(currentLesson.id) && (
+                          <Badge variant="outline" className="border-green-500/30 text-green-400">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Hoàn thành
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Course Info */}
@@ -294,13 +321,24 @@ const CourseViewer = () => {
 
                     {/* Lesson Content */}
                     {currentLesson.content_md && (currentLesson.is_preview || isAuthenticated) && (
-                      <div className="prose prose-invert max-w-none">
+                      <div className="prose prose-invert max-w-none mb-4">
                         <div className="bg-slate-800/50 p-4 rounded border border-slate-600">
                           <h3 className="text-white mb-3">Nội dung bài học:</h3>
                           <div className="text-slate-300 whitespace-pre-wrap">
                             {currentLesson.content_md}
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Lesson Completion Button */}
+                    {isAuthenticated && (currentLesson.is_preview || isAuthenticated) && (
+                      <div className="flex items-center justify-between mb-4">
+                        <LessonCompletionButton
+                          lessonId={currentLesson.id}
+                          isCompleted={isLessonCompleted(currentLesson.id)}
+                          onMarkCompleted={handleMarkLessonCompleted}
+                        />
                       </div>
                     )}
 
@@ -361,7 +399,20 @@ const CourseViewer = () => {
                   {totalLessons} bài học
                 </span>
               </div>
-              <Progress value={0} className="w-full" />
+              
+              {/* Course Progress */}
+              {isAuthenticated && courseProgress && (
+                <CourseProgressBar
+                  progress={getCourseCompletionPercentage()}
+                  completedLessons={courseProgress.completed_lessons}
+                  totalLessons={courseProgress.total_lessons}
+                  isCompleted={isCourseCompleted()}
+                />
+              )}
+              
+              {!isAuthenticated && (
+                <Progress value={0} className="w-full" />
+              )}
             </CardHeader>
             
             <CardContent className="p-0">
@@ -380,6 +431,7 @@ const CourseViewer = () => {
                     <div className="space-y-1">
                       {module.lessons.map((lesson, lessonIndex) => {
                         const isAccessible = lesson.is_preview || isAuthenticated;
+                        const lessonCompleted = isLessonCompleted(lesson.id);
                         return (
                           <button
                             key={lesson.id}
@@ -397,6 +449,8 @@ const CourseViewer = () => {
                               <div className="flex-shrink-0">
                                 {!isAccessible ? (
                                   <Lock className="w-4 h-4 text-slate-500" />
+                                ) : lessonCompleted ? (
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
                                 ) : currentLesson?.id === lesson.id ? (
                                   <Play className="w-4 h-4 text-purple-400" />
                                 ) : (
@@ -415,6 +469,11 @@ const CourseViewer = () => {
                                   {lesson.is_preview && (
                                     <Badge variant="outline" className="border-green-500/30 text-green-400 text-xs">
                                       Preview
+                                    </Badge>
+                                  )}
+                                  {lessonCompleted && (
+                                    <Badge variant="outline" className="border-green-500/30 text-green-400 text-xs">
+                                      Hoàn thành
                                     </Badge>
                                   )}
                                   {!isAccessible && (
