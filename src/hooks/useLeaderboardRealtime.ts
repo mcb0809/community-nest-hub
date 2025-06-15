@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useLevelConfig } from "./useLevelConfig";
@@ -25,41 +25,29 @@ export interface LeaderboardUser {
 export function useLeaderboardRealtime() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
 
-  // Use refs to prevent re-subscriptions
-  const channelRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
+  const fetchLeaderboard = useCallback(async () => {
+    if (levelConfigs.length === 0) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
 
-  // Fetch function - completely independent of state
-  const fetchLeaderboard = async () => {
     try {
       const { data: profilesData, error: profilesError } = await supabase
         .from("user_profiles")
-        .select(`
-          id,
-          display_name,
-          avatar_url,
-          email,
-          created_at
-        `);
+        .select(`id, display_name, avatar_url, email, created_at`);
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
-        setLoading(false);
+        setUsers([]);
         return;
       }
 
-      const { data: statsData } = await supabase
-        .from("user_stats")
-        .select("*");
-
-      const { data: postsData } = await supabase
-        .from("posts")
-        .select("user_id")
-        .eq("visibility", "public");
+      const { data: statsData } = await supabase.from("user_stats").select("*");
+      const { data: postsData } = await supabase.from("posts").select("user_id").eq("visibility", "public");
 
       const postsCounts: Record<string, number> = {};
       if (postsData) {
@@ -70,7 +58,7 @@ export function useLeaderboardRealtime() {
         });
       }
 
-      const mapped: LeaderboardUser[] = (profilesData || []).map((profile: any) => {
+      const mapped = (profilesData || []).map((profile: any) => {
         const userStats = statsData?.find(s => s.user_id === profile.id);
         const totalXp = userStats?.total_xp || 0;
         const level = userStats?.level || 1;
@@ -99,7 +87,7 @@ export function useLeaderboardRealtime() {
           coursesCompleted: userStats?.courses_completed ?? 0,
           streak: userStats?.current_streak ?? 0,
           badges: [],
-          isOnline: onlineUsers.has(profile.id),
+          isOnline: false, // Default to false, will be updated by presence
           joinDate: profile.created_at || new Date().toISOString(),
           title: undefined,
           postsCount: postsCounts[profile.id] || 0,
@@ -110,98 +98,80 @@ export function useLeaderboardRealtime() {
       });
 
       mapped.sort((a, b) => b.xp - a.xp);
-      setUsers(mapped);
-      setLoading(false);
+      
+      setUsers(currentUsers => {
+        const onlineStatusMap = new Map<string, boolean>();
+        currentUsers.forEach(u => {
+          if (u.isOnline) {
+            onlineStatusMap.set(u.id, true);
+          }
+        });
+        
+        return mapped.map(newUser => ({
+          ...newUser,
+          isOnline: onlineStatusMap.has(newUser.id),
+        }));
+      });
+
     } catch (error) {
       console.error('Error in fetchLeaderboard:', error);
       setUsers([]);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [levelConfigs, getLevelByNumber]);
 
-  // Setup realtime subscription - only once when user and levelConfigs are ready
+  // Effect to run the initial fetch and subsequent fetches when configs change
   useEffect(() => {
-    if (!user?.id || !levelConfigs.length || isSubscribedRef.current) {
-      if (!user?.id || !levelConfigs.length) {
-        setLoading(false);
-      }
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+  
+  // Effect to manage the realtime channel
+  useEffect(() => {
+    if (!user?.id) {
       return;
     }
 
-    console.log('Setting up leaderboard realtime subscription...');
+    // Use a stable channel name. Supabase handles channel instances.
+    const channel = supabase.channel('leaderboard-realtime');
 
-    // Initial fetch
-    fetchLeaderboard();
-
-    // Create channel with unique identifier
-    const channelName = `leaderboard-${user.id}-${Date.now()}`;
-    const channel = supabase.channel(channelName, { 
-      config: { presence: { key: 'user_id' } } 
-    });
-    
-    channelRef.current = channel;
-    isSubscribedRef.current = true;
-
-    // Setup all event listeners before subscribing
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const onlineUserIds = new Set<string>();
-        Object.keys(state).forEach(key => {
-          const presences = state[key];
-          presences.forEach((presence: any) => {
-            if (presence.user_id) onlineUserIds.add(presence.user_id);
-          });
+    const handleSync = () => {
+      const state = channel.presenceState();
+      const onlineUserIds = new Set<string>();
+      Object.values(state).forEach((presences: any) => {
+        presences.forEach((presence: any) => {
+          if (presence.user_id) onlineUserIds.add(presence.user_id);
         });
-        setOnlineUsers(onlineUserIds);
-        // Update users with new online status
-        setUsers(prevUsers => 
-          prevUsers.map(user => ({
-            ...user,
-            isOnline: onlineUserIds.has(user.id)
-          }))
-        );
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, () => {
-        fetchLeaderboard();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "xp_logs" }, () => {
-        fetchLeaderboard();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        fetchLeaderboard();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "level_config" }, () => {
-        fetchLeaderboard();
+      });
+      setUsers(prevUsers => 
+        prevUsers.map(u => ({
+          ...u,
+          isOnline: onlineUserIds.has(u.id)
+        }))
+      );
+    };
+
+    channel
+      .on('presence', { event: 'sync' }, handleSync)
+      .on('presence', { event: 'join' }, handleSync)
+      .on('presence', { event: 'leave' }, handleSync)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, fetchLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "xp_logs" }, fetchLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, fetchLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "level_config" }, fetchLeaderboard)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString()
+          });
+        }
       });
 
-    // Subscribe and track presence
-    channel.subscribe(async (status) => {
-      console.log('Leaderboard subscription status:', status);
-      
-      if (status === 'SUBSCRIBED') {
-        await channel.track({
-          user_id: user.id,
-          online_at: new Date().toISOString()
-        });
-      }
-    });
-
-    // Cleanup function
     return () => {
-      console.log('Cleaning up leaderboard subscription...');
-      if (channelRef.current) {
-        try {
-          channelRef.current.untrack?.();
-          supabase.removeChannel(channelRef.current);
-        } catch (error) {
-          console.log('Channel cleanup error:', error);
-        }
-        channelRef.current = null;
-      }
-      isSubscribedRef.current = false;
+      supabase.removeChannel(channel);
     };
-  }, [user?.id, levelConfigs.length]); // Minimal, stable dependencies
+  }, [user?.id, fetchLeaderboard]);
 
   return { users, loading };
 }
