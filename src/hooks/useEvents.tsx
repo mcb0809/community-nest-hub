@@ -68,7 +68,12 @@ const sendEventWebhook = async (event: Event) => {
   }
 };
 
-const sendRegistrationWebhook = async (event: Event, userName: string, userId: string, userEmail: string | null) => {
+const sendRegistrationWebhook = async (
+  event: Event,
+  userName: string,
+  userId: string,
+  userEmail: string | null
+) => {
   try {
     console.log('=== STARTING REGISTRATION WEBHOOK ===');
     console.log('Event ID:', event.id);
@@ -83,16 +88,19 @@ const sendRegistrationWebhook = async (event: Event, userName: string, userId: s
     console.log('Webhook URL:', webhookUrl);
     console.log('Credentials generated successfully');
     
+    // Đảm bảo mọi trường đều là string (nếu null thì để "")
+    const safeString = (value: any) => (value !== null && value !== undefined ? String(value) : '');
+
     const payload = {
-      event_id: event.id,
-      event_title: event.title,
-      event_date: event.date,
-      event_time: event.time,
-      user_id: userId,
-      user_name: userName,
-      user_email: userEmail,
-      registered_at: new Date().toISOString(),
-      timestamp: new Date().toISOString()
+      event_id: safeString(event.id),
+      event_title: safeString(event.title),
+      event_date: safeString(event.date),
+      event_time: safeString(event.time),
+      user_id: safeString(userId),
+      user_name: safeString(userName),
+      user_email: safeString(userEmail),
+      registered_at: new Date().toISOString(), // ISO string
+      timestamp: new Date().toISOString(), // ISO string
     };
     
     console.log('Payload to send:', JSON.stringify(payload, null, 2));
