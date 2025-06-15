@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -77,11 +76,9 @@ const sendRegistrationWebhook = async (
 ) => {
   try {
     console.log('=== STARTING REGISTRATION WEBHOOK ===');
-    console.log('Event ID:', event.id);
-    console.log('User Name:', userName);
-    console.log('User ID:', userId);
-    console.log('User Email:', userEmail);
     console.log('Event Title:', event.title);
+    console.log('User Name:', userName);
+    console.log('User Email:', userEmail);
     
     const webhookUrl = 'https://mcbaivn.tino.page/webhook/eventjoint';
     const credentials = btoa('MCBAIVN:Machbang8920!');
@@ -89,14 +86,12 @@ const sendRegistrationWebhook = async (
     console.log('Webhook URL:', webhookUrl);
     console.log('Credentials generated successfully');
     
-    // Format the payload to match backend expectations
+    // Simplified payload without event_id and user_id
     const payload = {
       user_name: userName || '',
       user_email: userEmail || '',
       event_title: event.title || '',
       event_time: `${event.date} ${event.time}`,
-      event_id: event.id || '',
-      user_id: userId || '',
       registered_at: new Date().toISOString()
     };
     
@@ -104,7 +99,7 @@ const sendRegistrationWebhook = async (
     
     const response = await fetch(webhookUrl, {
       method: 'POST',
-      mode: 'no-cors', // Bypass CORS policy
+      mode: 'no-cors',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${credentials}`
@@ -112,8 +107,6 @@ const sendRegistrationWebhook = async (
       body: JSON.stringify(payload)
     });
 
-    // Với mode: 'no-cors', không thể đọc response status hoặc body
-    // Nhưng request vẫn được gửi thành công đến server
     console.log('✅ Registration webhook sent successfully (no-cors mode)');
     console.log('Note: Response status cannot be checked due to no-cors mode');
     
