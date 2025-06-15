@@ -120,10 +120,12 @@ const Members = () => {
     ? Math.round((onlineMembers / totalMembers) * 100) 
     : 0;
 
-  // Get top achievements for header including most active chatter
-  const mostActiveChatter = membersWithStats.reduce((prev, current) => 
-    (prev.messagesCount > current.messagesCount) ? prev : current
-  );
+  // Get top achievements for header including most active chatter - with safe reduce
+  const mostActiveChatter = membersWithStats.length > 0 
+    ? membersWithStats.reduce((prev, current) => 
+        (prev.messagesCount > current.messagesCount) ? prev : current
+      )
+    : null;
 
   const topUsers = [
     {
