@@ -270,10 +270,10 @@ export const useChat = (channelId?: string) => {
       setMessages(prev => prev.map(msg => 
         msg.id === optimisticMessage.id ? {
           ...messageData,
-          reactions: messageData.reactions || {},
+          reactions: (messageData.reactions as Record<string, string[]>) || {},
           user_profiles: optimisticMessage.user_profiles,
           message_attachments: []
-        } : msg
+        } as Message : msg
       ));
 
       console.log('Message sent successfully:', messageData);
