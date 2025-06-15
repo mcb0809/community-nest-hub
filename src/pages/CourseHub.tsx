@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,9 @@ interface Course {
   level: number;
   total_hours: number;
   price: number;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 const CourseHub = () => {
@@ -50,13 +54,19 @@ const CourseHub = () => {
 
   const fetchCourses = async () => {
     try {
+      console.log('Fetching courses...');
       const { data, error } = await supabase
         .from('courses')
         .select('*')
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Fetched courses:', data);
       setCourses(data || []);
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -110,7 +120,7 @@ const CourseHub = () => {
   };
 
   const getUniqueCategories = () => {
-    const categories = courses.map(course => course.category);
+    const categories = courses.map(course => course.category).filter(Boolean);
     return [...new Set(categories)];
   };
 
@@ -163,6 +173,15 @@ const CourseHub = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Debug info - remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-slate-800 p-4 rounded-lg">
+          <p className="text-slate-300 text-sm">
+            Debug: Total courses: {courses.length}, Filtered: {filteredCourses.length}
+          </p>
+        </div>
+      )}
 
       {/* Filters */}
       <Card className="glass border-slate-600">
@@ -221,6 +240,10 @@ const CourseHub = () => {
                       src={course.thumbnail_url}
                       alt={course.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        console.log('Image failed to load:', course.thumbnail_url);
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
                   </div>
                 ) : (
@@ -232,7 +255,7 @@ const CourseHub = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Badge variant="outline" className="border-cyan-500/30 text-cyan-400">
-                      {course.category}
+                      {course.category || 'Không phân loại'}
                     </Badge>
                     <Badge variant="outline" className={getLevelColor(course.level)}>
                       {getLevelText(course.level)}
@@ -257,7 +280,7 @@ const CourseHub = () => {
                   </span>
                   <span className="flex items-center">
                     <User className="w-4 h-4 mr-1" />
-                    Miễn phí
+                    {course.price === 0 ? 'Miễn phí' : `${course.price} VND`}
                   </span>
                 </div>
                 
@@ -275,8 +298,15 @@ const CourseHub = () => {
         <Card className="glass border-slate-600">
           <CardContent className="p-12 text-center">
             <Search className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Không tìm thấy khóa học</h3>
-            <p className="text-slate-400">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              {courses.length === 0 ? 'Chưa có khóa học nào' : 'Không tìm thấy khóa học'}
+            </h3>
+            <p className="text-slate-400">
+              {courses.length === 0 
+                ? 'Hiện tại chưa có khóa học nào được công khai' 
+                : 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
+              }
+            </p>
           </CardContent>
         </Card>
       )}
