@@ -13,6 +13,7 @@ import Web3Dashboard from "./pages/Web3Dashboard";
 import CourseHub from "./pages/CourseHub";
 import CourseViewer from "./pages/CourseViewer";
 import CommunityChat from "./pages/CommunityChat";
+import Community from "./pages/Community";
 import EventHub from "./pages/EventHub";
 import DocumentationCenter from "./pages/DocumentationCenter";
 import Members from "./pages/Members";
@@ -20,6 +21,7 @@ import CourseAdmin from "./pages/admin/CourseAdmin";
 import CourseDetail from "./pages/admin/CourseDetail";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminPosts from "./pages/admin/AdminPosts";
 import AdminLandingPage from "./pages/admin/AdminLandingPage";
 import AdminEvents from "./pages/admin/AdminEvents";
 import AdminDocuments from "./pages/admin/AdminDocuments";
@@ -50,6 +52,7 @@ const App = () => (
                       <Route path="users" element={<AdminUsers />} />
                       <Route path="course" element={<CourseAdmin />} />
                       <Route path="course/:courseId" element={<CourseDetail />} />
+                      <Route path="posts" element={<AdminPosts />} />
                       <Route path="messages" element={<div className="text-white">Messages Management - Coming Soon</div>} />
                       <Route path="events" element={<AdminEvents />} />
                       <Route path="documents" element={<AdminDocuments />} />
@@ -73,6 +76,7 @@ const App = () => (
                     <Route path="/courses/:courseId" element={<CourseViewer />} />
                     <Route path="/course/:slug" element={<CourseViewer />} />
                     <Route path="/chat" element={<CommunityChat />} />
+                    <Route path="/community" element={<Community />} />
                     <Route path="/events" element={<EventHub />} />
                     <Route path="/documents" element={<DocumentationCenter />} />
                     <Route path="/members" element={<Members />} />

@@ -5,6 +5,7 @@ import {
   Home,
   BookOpen, 
   MessageCircle, 
+  Users,
   Calendar, 
   FileText, 
   Trophy,
@@ -15,7 +16,8 @@ import { cn } from '@/lib/utils';
 const navigation = [
   { name: 'Home', href: '/', icon: Home, label: 'Trang chủ' },
   { name: 'Courses', href: '/courses', icon: BookOpen, label: 'Khóa học' },
-  { name: 'Chat', href: '/chat', icon: MessageCircle, label: 'Thảo luận' },
+  { name: 'Chat', href: '/chat', icon: MessageCircle, label: 'Chat' },
+  { name: 'Community', href: '/community', icon: Users, label: 'Cộng đồng' },
   { name: 'Events', href: '/events', icon: Calendar, label: 'Sự kiện' },
   { name: 'Resources', href: '/documents', icon: FileText, label: 'Tài liệu' },
   { name: 'Ranking', href: '/members', icon: Trophy, label: 'Xếp hạng' },

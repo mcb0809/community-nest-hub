@@ -27,7 +27,7 @@ export interface Post {
   user_profiles?: {
     display_name: string;
     avatar_url?: string;
-  };
+  } | null;
 }
 
 export const usePosts = () => {
@@ -67,13 +67,31 @@ export const usePosts = () => {
 
       if (error) throw error;
       
-      const typedData = (data || []).map(post => ({
-        ...post,
+      const transformedPosts: Post[] = (data || []).map(post => ({
+        id: post.id,
+        title: post.title,
+        content: post.content,
         tags: post.tags || [],
-        attachments: post.post_attachments || []
-      })) as Post[];
+        user_id: post.user_id,
+        visibility: post.visibility as 'public' | 'vip' | 'draft',
+        is_pinned: post.is_pinned || false,
+        created_at: post.created_at,
+        updated_at: post.updated_at,
+        attachments: (post.post_attachments || []).map((att: any) => ({
+          id: att.id,
+          post_id: att.post_id,
+          type: att.type,
+          name: att.name,
+          url: att.url,
+          meta: att.meta,
+          uploaded_at: att.uploaded_at
+        })),
+        user_profiles: Array.isArray(post.user_profiles) && post.user_profiles.length > 0 
+          ? post.user_profiles[0] 
+          : post.user_profiles || null
+      }));
       
-      setPosts(typedData);
+      setPosts(transformedPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
     } finally {
@@ -86,7 +104,10 @@ export const usePosts = () => {
       const { data, error } = await supabase
         .from('posts')
         .insert([{
-          ...postData,
+          title: postData.title,
+          content: postData.content,
+          tags: postData.tags,
+          visibility: postData.visibility,
           user_id: user?.id,
           is_pinned: false
         }])
@@ -101,14 +122,24 @@ export const usePosts = () => {
 
       if (error) throw error;
       
-      const typedData = {
-        ...data,
+      const transformedPost: Post = {
+        id: data.id,
+        title: data.title,
+        content: data.content,
         tags: data.tags || [],
-        attachments: []
-      } as Post;
+        user_id: data.user_id,
+        visibility: data.visibility as 'public' | 'vip' | 'draft',
+        is_pinned: data.is_pinned || false,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        attachments: [],
+        user_profiles: Array.isArray(data.user_profiles) && data.user_profiles.length > 0 
+          ? data.user_profiles[0] 
+          : data.user_profiles || null
+      };
       
-      setPosts(prev => [typedData, ...prev]);
-      return typedData;
+      setPosts(prev => [transformedPost, ...prev]);
+      return transformedPost;
     } catch (error) {
       console.error('Error creating post:', error);
       throw error;
@@ -120,7 +151,10 @@ export const usePosts = () => {
       const { data, error } = await supabase
         .from('posts')
         .update({
-          ...postData,
+          title: postData.title,
+          content: postData.content,
+          tags: postData.tags,
+          visibility: postData.visibility,
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
@@ -136,14 +170,32 @@ export const usePosts = () => {
 
       if (error) throw error;
       
-      const typedData = {
-        ...data,
+      const transformedPost: Post = {
+        id: data.id,
+        title: data.title,
+        content: data.content,
         tags: data.tags || [],
-        attachments: data.post_attachments || []
-      } as Post;
+        user_id: data.user_id,
+        visibility: data.visibility as 'public' | 'vip' | 'draft',
+        is_pinned: data.is_pinned || false,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        attachments: (data.post_attachments || []).map((att: any) => ({
+          id: att.id,
+          post_id: att.post_id,
+          type: att.type,
+          name: att.name,
+          url: att.url,
+          meta: att.meta,
+          uploaded_at: att.uploaded_at
+        })),
+        user_profiles: Array.isArray(data.user_profiles) && data.user_profiles.length > 0 
+          ? data.user_profiles[0] 
+          : data.user_profiles || null
+      };
       
-      setPosts(prev => prev.map(post => post.id === id ? typedData : post));
-      return typedData;
+      setPosts(prev => prev.map(post => post.id === id ? transformedPost : post));
+      return transformedPost;
     } catch (error) {
       console.error('Error updating post:', error);
       throw error;
