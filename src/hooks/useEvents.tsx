@@ -25,6 +25,49 @@ export interface Event {
   created_by: string | null;
 }
 
+const sendEventWebhook = async (event: Event) => {
+  try {
+    console.log('Sending webhook for new event:', event.id);
+    
+    const webhookUrl = 'https://mcbaivn.tino.page/webhook/eventcreate';
+    const credentials = btoa('MCBAIVN:Machbang8920!');
+    
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: JSON.stringify({
+        event_id: event.id,
+        title: event.title,
+        description: event.description,
+        type: event.type,
+        format: event.format,
+        date: event.date,
+        time: event.time,
+        duration: event.duration,
+        instructor: event.instructor,
+        location: event.location,
+        meeting_link: event.meeting_link,
+        max_attendees: event.max_attendees,
+        status: event.status,
+        tags: event.tags,
+        created_at: event.created_at,
+        timestamp: new Date().toISOString()
+      })
+    });
+
+    if (response.ok) {
+      console.log('Webhook sent successfully');
+    } else {
+      console.error('Webhook failed with status:', response.status);
+    }
+  } catch (error) {
+    console.error('Error sending webhook:', error);
+  }
+};
+
 export const useEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +127,10 @@ export const useEvents = () => {
       };
 
       setEvents(prev => [...prev, transformedData]);
+      
+      // Send webhook after successful creation
+      await sendEventWebhook(transformedData);
+      
       toast({
         title: "Success",
         description: "Event created successfully",
