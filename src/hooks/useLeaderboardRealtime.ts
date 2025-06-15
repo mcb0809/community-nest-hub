@@ -29,13 +29,13 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
 
-  // Dùng ref để tránh tạo lại channel nhiều lần
+  // Ref lưu channel instance để tránh tạo lại
   const channelRef = useRef<any>(null);
 
-  // Hàm lấy bảng xếp hạng, không phụ thuộc onlineUsers (để tránh useEffect lặp)
+  // Hàm fetchLeaderboard không phụ thuộc onlineUsers, truyền vào nếu cần
   const fetchLeaderboard = useCallback(
     async (currentOnlineUsers?: Set<string>) => {
-      const onlineSet = currentOnlineUsers || onlineUsers; // dùng onlineUsers truyền vào nếu có
+      const onlineSet = currentOnlineUsers || onlineUsers; // fallback
       setLoading(true);
 
       try {
@@ -63,7 +63,6 @@ export function useLeaderboardRealtime() {
           .select("user_id")
           .eq("visibility", "public");
 
-        // Count posts by user
         const postsCounts: Record<string, number> = {};
         if (postsData) {
           postsData.forEach(post => {
@@ -73,14 +72,13 @@ export function useLeaderboardRealtime() {
           });
         }
 
-        // Map data to LeaderboardUser
         const mapped: LeaderboardUser[] = (profilesData || []).map((profile: any) => {
           const userStats = statsData?.find(s => s.user_id === profile.id);
           const totalXp = userStats?.total_xp || 0;
           const level = userStats?.level || 1;
           const levelConfig = getLevelByNumber(level);
 
-          // Level progress từ config (dùng lại code cũ đảm bảo)
+          // Level progress từ config
           const calculateLevelProgress = (xp: number, currentLevel: number) => {
             if (!levelConfigs.length) return 0;
             const currentLevelConfig = getLevelByNumber(currentLevel);
@@ -123,14 +121,13 @@ export function useLeaderboardRealtime() {
         setLoading(false);
       }
     },
-    [levelConfigs, getLevelByNumber] // Không thêm onlineUsers vào dependencies
+    [levelConfigs, getLevelByNumber, onlineUsers] // onlineUsers trong deps chỉ để tránh stale state, thực tế luôn fetch realtime theo presence event
   );
 
   // Cleanup channel đúng chuẩn
   const cleanupChannel = useCallback(() => {
     if (channelRef.current) {
       try {
-        // untrack nếu có
         channelRef.current.untrack?.();
         supabase.removeChannel(channelRef.current);
       } catch {}
@@ -138,22 +135,22 @@ export function useLeaderboardRealtime() {
     }
   }, []);
 
-  // Main effect chỉ tạo và cleanup channel 1 lần theo user.id và levelConfigs
+  // Main effect: tạo và cleanup channel duy nhất khi user id hoặc levelConfigs đủ dữ liệu.
   useEffect(() => {
-    // Nếu không đủ dữ liệu, hoặc channel đã được tạo, thoát
+    // Điều kiện tạo channel realtime leaderboard
     if (!user?.id || !levelConfigs.length) return;
 
-    // Cleanup bất kỳ channel cũ
+    // CLEANUP TRƯỚC khi tạo mới (fix triệt để double subscribe)
     cleanupChannel();
 
-    // Tạo channel mới (unique cho user)
-    const channelId = `leaderboard-realtime-${user.id}-${Date.now()}`;
+    // Tạo channel mới
+    const channelId = `leaderboard-realtime-${user.id}`;
     const channel = supabase.channel(channelId, { config: { presence: { key: 'user_id' } } });
     channelRef.current = channel;
 
-    fetchLeaderboard(); // Lần đầu fetch
+    fetchLeaderboard(); // Fetch lần đầu
 
-    // Đăng ký sự kiện
+    // Đăng ký presence
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -164,8 +161,8 @@ export function useLeaderboardRealtime() {
             if (presence.user_id) onlineUserIds.add(presence.user_id);
           });
         });
-        setOnlineUsers(onlineUserIds); // cập nhật
-        fetchLeaderboard(onlineUserIds);
+        setOnlineUsers(onlineUserIds);
+        fetchLeaderboard(onlineUserIds); // update bảng realtime
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, () => {
         fetchLeaderboard();
@@ -178,18 +175,20 @@ export function useLeaderboardRealtime() {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "level_config" }, () => {
         fetchLeaderboard();
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: user.id,
-            online_at: new Date().toISOString()
-          });
-        }
       });
 
+    // CHỈ subscribe duy nhất 1 lần cho channel
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({
+          user_id: user.id,
+          online_at: new Date().toISOString()
+        });
+      }
+    });
+
+    // Cleanup khi component unmount hoặc deps thay đổi
     return () => {
-      // cleanup mọi thứ khi user/id đổi hoặc unmount
       cleanupChannel();
     };
   }, [user?.id, levelConfigs.length, fetchLeaderboard, cleanupChannel]);
