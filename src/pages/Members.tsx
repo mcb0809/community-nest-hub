@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
@@ -166,7 +167,7 @@ const Members = () => {
         topUsers={topUsers}
       />
 
-      {/* Section Highlight Tuần này */}
+      {/* Section Highlight Tuần này - Updated to remove messages highlight */}
       <div className="flex flex-col md:flex-row items-center justify-center gap-4">
         <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-400/20 to-purple-500/20 rounded-xl py-3 px-4">
           <Trophy className="w-5 h-5 text-yellow-400" />
@@ -174,13 +175,6 @@ const Members = () => {
             {filteredMembers[0]?.name || 'Chưa có dữ liệu'}
           </span>
           <span className="text-sm text-slate-400">– Rank #1 với {filteredMembers[0]?.totalPoints?.toLocaleString() || 0} XP</span>
-        </div>
-        <div className="flex items-center gap-2 bg-gradient-to-r from-green-400/20 to-cyan-500/20 rounded-xl py-3 px-4">
-          <MessageSquare className="w-5 h-5 text-green-400" />
-          <span className="text-white font-semibold">
-            {mostActiveChatter?.name || 'Chưa có dữ liệu'}
-          </span>
-          <span className="text-sm text-slate-400">– {mostActiveChatter?.messagesCount || 0} tin nhắn</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-xl py-3 px-4">
           <Crown className="w-5 h-5 text-purple-400" />
