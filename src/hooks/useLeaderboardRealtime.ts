@@ -26,43 +26,105 @@ export function useLeaderboardRealtime() {
     console.log("Fetching leaderboard data...");
     
     try {
-      // Use the new member_leaderboard view for optimized queries
-      const { data, error } = await supabase
-        .from("member_leaderboard")
-        .select("*")
-        .limit(100); // Limit for performance
+      // First try to get data from user_profiles with basic stats
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("user_profiles")
+        .select(`
+          id,
+          display_name,
+          avatar_url,
+          email,
+          created_at
+        `);
       
-      if (error) {
-        console.error("Error fetching leaderboard:", error);
+      if (profilesError) {
+        console.error("Error fetching user profiles:", profilesError);
         setLoading(false);
         return;
       }
-      
-      console.log("Raw leaderboard data:", data);
-      
-      const mapped: LeaderboardUser[] = (data || []).map((u: any) => {
-        // Ensure all values are properly handled with fallbacks
-        const totalXp = u.total_xp || 0;
-        const level = u.level || 1;
+
+      console.log("User profiles data:", profilesData);
+
+      // Get user stats separately
+      const { data: statsData, error: statsError } = await supabase
+        .from("user_stats")
+        .select("*");
+
+      if (statsError) {
+        console.warn("Error fetching user stats:", statsError);
+      }
+
+      console.log("User stats data:", statsData);
+
+      // Get posts count for each user
+      const { data: postsData, error: postsError } = await supabase
+        .from("posts")
+        .select("user_id")
+        .eq("visibility", "public");
+
+      if (postsError) {
+        console.warn("Error fetching posts:", postsError);
+      }
+
+      // Count posts by user
+      const postsCounts: Record<string, number> = {};
+      if (postsData) {
+        postsData.forEach(post => {
+          if (post.user_id) {
+            postsCounts[post.user_id] = (postsCounts[post.user_id] || 0) + 1;
+          }
+        });
+      }
+
+      console.log("Posts counts:", postsCounts);
+
+      // Combine all data
+      const mapped: LeaderboardUser[] = (profilesData || []).map((profile: any) => {
+        const userStats = statsData?.find(s => s.user_id === profile.id);
+        const totalXp = userStats?.total_xp || 0;
+        const level = userStats?.level || 1;
         
+        // Simple level progress calculation to avoid database function issues
+        const calculateSimpleLevelProgress = (xp: number, currentLevel: number) => {
+          const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000, 25000];
+          
+          if (currentLevel <= 0 || currentLevel > levelThresholds.length) {
+            return 0;
+          }
+          
+          let accumulatedXp = 0;
+          for (let i = 0; i < currentLevel - 1; i++) {
+            accumulatedXp += levelThresholds[i] || 0;
+          }
+          
+          const currentLevelThreshold = levelThresholds[currentLevel - 1] || 1000;
+          const progressXp = Math.max(0, xp - accumulatedXp);
+          const progress = Math.min(100, Math.max(0, Math.round((progressXp / currentLevelThreshold) * 100)));
+          
+          return progress;
+        };
+
         return {
-          id: u.id,
-          name: u.name || 'Anonymous',
-          avatar: u.avatar,
+          id: profile.id,
+          name: profile.display_name || 'Anonymous',
+          avatar: profile.avatar_url,
           xp: totalXp,
           level: level,
-          levelProgress: Math.max(0, Math.min(100, u.level_progress || 0)), // Ensure valid range
-          coursesCompleted: u.courses_completed || 0,
-          streak: u.streak_days || 0,
+          levelProgress: calculateSimpleLevelProgress(totalXp, level),
+          coursesCompleted: userStats?.courses_completed || 0,
+          streak: userStats?.current_streak || 0,
           badges: [], // Will be implemented with badge system later
-          isOnline: u.is_online || false,
-          joinDate: u.joined_at || new Date().toISOString(),
+          isOnline: false, // Will be implemented with real-time presence later
+          joinDate: profile.created_at || new Date().toISOString(),
           title: undefined, // Can be set based on achievements later
-          postsCount: u.posts_count || 0, // Map posts_count from database
+          postsCount: postsCounts[profile.id] || 0,
         };
       });
+
+      // Sort by XP descending
+      mapped.sort((a, b) => b.xp - a.xp);
       
-      console.log("Mapped leaderboard users:", mapped);
+      console.log("Final mapped leaderboard users:", mapped);
       setUsers(mapped);
       setLoading(false);
     } catch (error) {
@@ -75,7 +137,7 @@ export function useLeaderboardRealtime() {
   useEffect(() => {
     fetchLeaderboard();
     
-    // Listen for realtime changes from user_stats table
+    // Listen for realtime changes
     const channel = supabase
       .channel("realtime-leaderboard")
       .on(
@@ -83,7 +145,7 @@ export function useLeaderboardRealtime() {
         { event: "*", schema: "public", table: "user_stats" },
         (payload) => {
           console.log("User stats changed:", payload);
-          fetchLeaderboard(); // Refetch when user_stats changes
+          fetchLeaderboard();
         }
       )
       .on(
@@ -91,7 +153,7 @@ export function useLeaderboardRealtime() {
         { event: "*", schema: "public", table: "xp_logs" },
         (payload) => {
           console.log("XP logs changed:", payload);
-          fetchLeaderboard(); // Refetch when new XP is logged
+          fetchLeaderboard();
         }
       )
       .on(
@@ -99,7 +161,7 @@ export function useLeaderboardRealtime() {
         { event: "*", schema: "public", table: "posts" },
         (payload) => {
           console.log("Posts changed:", payload);
-          fetchLeaderboard(); // Refetch when posts change
+          fetchLeaderboard();
         }
       )
       .subscribe();
