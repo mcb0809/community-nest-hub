@@ -15,6 +15,7 @@ export interface LeaderboardUser {
   isOnline: boolean;
   joinDate: string;
   title?: string;
+  postsCount: number; // Added this field
 }
 
 export function useLeaderboardRealtime() {
@@ -52,6 +53,7 @@ export function useLeaderboardRealtime() {
         isOnline: u.is_online || false,
         joinDate: u.joined_at,
         title: undefined, // Can be set based on achievements later
+        postsCount: u.posts_count || 0, // Map posts_count from database
       };
     });
     

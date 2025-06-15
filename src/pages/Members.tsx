@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
@@ -92,19 +91,19 @@ const Members = () => {
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? '',
       isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
-      // Use messages_count directly from the database view
-      messagesCount: (member as any).messages_count ?? 0,
+      // Use postsCount from the hook instead of messagesCount
+      messagesCount: member.postsCount ?? 0,
     };
   });
 
-  // Filter by Level and new filter for chatters
+  // Filter by Level and updated filter for posters (instead of chatters)
   const filteredMembers = membersWithStats.filter(member => {
     const matchesSearch = (member.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
       (filterType === 'top10' && member.rank <= 10) ||
       (filterType === 'online' && member.isOnline) ||
       (filterType === 'streak' && member.streak >= 7) ||
-      (filterType === 'chatters' && member.messagesCount >= 50);
+      (filterType === 'chatters' && member.messagesCount >= 5); // Changed threshold to 5 posts
     const matchesLevel = levelFilter ? member.level === levelFilter : true;
     return matchesSearch && matchesFilter && matchesLevel;
   });
@@ -121,10 +120,10 @@ const Members = () => {
     ? Math.round((onlineMembers / totalMembers) * 100) 
     : 0;
 
-  // Get most active poster using posts_count
+  // Get most active poster using postsCount
   const mostActivePoster = membersWithStats.length > 0 
     ? membersWithStats.reduce((prev, current) => 
-        ((prev as any).posts_count || 0) > ((current as any).posts_count || 0) ? prev : current
+        (prev.postsCount || 0) > (current.postsCount || 0) ? prev : current
       )
     : null;
 
@@ -136,8 +135,8 @@ const Members = () => {
     },
     {
       name: mostActivePoster?.name || "Chưa có dữ liệu",
-      achievement: `${(mostActivePoster as any)?.posts_count || 0} bài viết đã đăng`,
-      value: (mostActivePoster as any)?.posts_count || 0
+      achievement: `${mostActivePoster?.postsCount || 0} bài viết đã đăng`,
+      value: mostActivePoster?.postsCount || 0
     },
     {
       name: membersWithStats.filter(m => m.isOnline).length > 0 ? `${membersWithStats.filter(m => m.isOnline).length} thành viên` : "Chưa có dữ liệu",
@@ -168,7 +167,7 @@ const Members = () => {
         topUsers={topUsers}
       />
 
-      {/* Section Highlight Tuần này - Updated to show posts instead of messages */}
+      {/* Section Highlight Tuần này - Updated to show posts */}
       <div className="flex flex-col md:flex-row items-center justify-center gap-4">
         <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-400/20 to-purple-500/20 rounded-xl py-3 px-4">
           <Trophy className="w-5 h-5 text-yellow-400" />
@@ -182,7 +181,7 @@ const Members = () => {
           <span className="text-white font-semibold">
             {mostActivePoster?.name || 'Chưa có dữ liệu'}
           </span>
-          <span className="text-sm text-slate-400">– {(mostActivePoster as any)?.posts_count || 0} bài viết</span>
+          <span className="text-sm text-slate-400">– {mostActivePoster?.postsCount || 0} bài viết</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-xl py-3 px-4">
           <Crown className="w-5 h-5 text-purple-400" />
