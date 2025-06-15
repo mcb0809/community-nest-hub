@@ -29,6 +29,7 @@ export const useLessonProgress = (courseId?: string) => {
   const [lessonProgress, setLessonProgress] = useState<Map<string, LessonProgress>>(new Map());
   const [courseProgress, setCourseProgress] = useState<CourseProgress | null>(null);
   const [loading, setLoading] = useState(true);
+  const [wasAlreadyCompleted, setWasAlreadyCompleted] = useState(false);
 
   // Fetch lesson progress for current course
   const fetchLessonProgress = async () => {
@@ -83,6 +84,12 @@ export const useLessonProgress = (courseId?: string) => {
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
+      
+      // Track if course was already completed before this session
+      if (data?.completed_at) {
+        setWasAlreadyCompleted(true);
+      }
+      
       setCourseProgress(data);
     } catch (error) {
       console.error('Error fetching course progress:', error);
@@ -158,21 +165,24 @@ export const useLessonProgress = (courseId?: string) => {
   useEffect(() => {
     if (courseId) {
       setLoading(true);
+      setWasAlreadyCompleted(false); // Reset on course change
       Promise.all([fetchLessonProgress(), fetchCourseProgress()]);
     }
   }, [courseId, user?.id]);
 
-  // Check for course completion and award XP
+  // Check for course completion and award XP - only if course was just completed
   useEffect(() => {
-    if (courseProgress?.completed_at && !loading) {
-      // Course was just completed, award XP
+    if (courseProgress?.completed_at && !loading && !wasAlreadyCompleted) {
+      // Course was just completed for the first time, award XP
       logCourseComplete(user?.id!, courseId!);
       toast({
         title: "🎉 Hoàn thành khóa học!",
         description: "Chúc mừng bạn đã hoàn thành khóa học này!",
       });
+      // Mark as already completed to prevent duplicate XP
+      setWasAlreadyCompleted(true);
     }
-  }, [courseProgress?.completed_at]);
+  }, [courseProgress?.completed_at, loading, wasAlreadyCompleted]);
 
   return {
     lessonProgress,
