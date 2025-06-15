@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
@@ -32,141 +33,6 @@ function getLevel(xp: number) {
   return { level: 10, progress: 100, maxXp: acc };
 }
 
-// Định nghĩa hàm tính dữ liệu leaderboard: nhận logs, trả về user info với xp, level, streak...
-function getLeaderboardData() {
-  // Dữ liệu bên dưới nên lấy từ backend thực, đây đang mock để dùng thử
-  const membersData = [
-    {
-      id: '1',
-      name: 'Hoàng Minh',
-      avatar: '',
-      level: 47,
-      xp: 8950,
-      maxXp: 10000,
-      rank: 1,
-      totalPoints: 125840,
-      coursesCompleted: 23,
-      streak: 45,
-      joinDate: '2023-01-15',
-      badges: ['Founder', 'Master Learner', 'Streak King', 'Course Crusher'],
-      isOnline: true,
-      title: 'Học viên xuất sắc'
-    },
-    {
-      id: '2',
-      name: 'Lan Anh Nguyen',
-      avatar: '',
-      level: 42,
-      xp: 6750,
-      maxXp: 8500,
-      rank: 2,
-      totalPoints: 98650,
-      coursesCompleted: 19,
-      streak: 30,
-      joinDate: '2023-02-20',
-      badges: ['Top Contributor', 'Study Buddy', 'Achievement Hunter'],
-      isOnline: true,
-      title: 'Cộng tác viên tích cực'
-    },
-    {
-      id: '3',
-      name: 'Đức Thành',
-      avatar: '',
-      level: 38,
-      xp: 4200,
-      maxXp: 7500,
-      rank: 3,
-      totalPoints: 87320,
-      coursesCompleted: 16,
-      streak: 22,
-      joinDate: '2023-03-10',
-      badges: ['Fast Learner', 'Quiz Master', 'Dedicated'],
-      isOnline: false,
-      title: 'Học sinh chăm chỉ'
-    },
-    {
-      id: '4',
-      name: 'Mai Phương',
-      avatar: '',
-      level: 35,
-      xp: 2800,
-      maxXp: 6000,
-      rank: 4,
-      totalPoints: 76540,
-      coursesCompleted: 14,
-      streak: 18,
-      joinDate: '2023-04-15',
-      badges: ['Consistent', 'Team Player'],
-      isOnline: true
-    },
-    {
-      id: '5',
-      name: 'Tuấn Anh',
-      avatar: '',
-      level: 32,
-      xp: 1950,
-      maxXp: 5500,
-      rank: 5,
-      totalPoints: 65890,
-      coursesCompleted: 12,
-      streak: 15,
-      joinDate: '2023-05-20',
-      badges: ['Rising Star', 'Active'],
-      isOnline: false
-    },
-    {
-      id: '6',
-      name: 'Thảo My',
-      avatar: '',
-      level: 29,
-      xp: 3200,
-      maxXp: 5000,
-      rank: 6,
-      totalPoints: 58420,
-      coursesCompleted: 11,
-      streak: 12,
-      joinDate: '2023-06-10',
-      badges: ['Newcomer Champion'],
-      isOnline: true
-    },
-    {
-      id: '7',
-      name: 'Văn Hùng',
-      avatar: '',
-      level: 27,
-      xp: 1800,
-      maxXp: 4500,
-      rank: 7,
-      totalPoints: 52180,
-      coursesCompleted: 10,
-      streak: 8,
-      joinDate: '2023-07-05',
-      badges: ['Persistent'],
-      isOnline: false
-    },
-    {
-      id: '8',
-      name: 'Kim Liên',
-      avatar: '',
-      level: 25,
-      xp: 2100,
-      maxXp: 4000,
-      rank: 8,
-      totalPoints: 48760,
-      coursesCompleted: 9,
-      streak: 25,
-      joinDate: '2023-08-18',
-      badges: ['Streak Master', 'Dedicated'],
-      isOnline: true
-    }
-  ];
-  // Giả sử mỗi member đã có xp → tính level, progress %
-  return membersData.map(mem => {
-    const lv = getLevel(mem.xp);
-    return { ...mem, level: lv.level, maxXp: lv.maxXp, levelProgress: lv.progress };
-  });
-}
-
 const filterOptions = [
   { value: 'all', label: 'Tất cả', icon: Trophy },
   { value: 'top10', label: 'Top 10', icon: Crown },
@@ -187,33 +53,36 @@ const Members = () => {
   const [showXPModal, setShowXPModal] = useState(false);
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
 
-  // Thay vì getLeaderboardData(), dùng dữ liệu realtime
+  // Lấy dữ liệu realtime từ Supabase
   const { users: members, loading } = useLeaderboardRealtime();
 
-  // Assign rank, totalPoints, maxXp for rendering MemberCard
-  const membersWithStats = members.map((member, i) => ({
-    ...member,
-    rank: i + 1,
-    totalPoints: member.xp, // fallback: show XP as totalPoints, update if needed!
-    maxXp: (() => {
-      // replicate levelThresholds logic
-      const thresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
-      let acc = 0, level = 1;
-      for (let th = 0; th < thresholds.length; th++) {
-        acc += thresholds[th];
-        if (member.xp < acc) {
-          return acc;
-        }
-      }
-      return acc; // if above highest
-    })(),
-  }));
+  // Chuẩn hóa và bổ sung các trường cần thiết cho MemberCard
+  const membersWithStats = members.map((member, i) => {
+    // Convert some fallback fields for compatibility
+    const levelData = getLevel(member.xp || 0);
+    return {
+      ...member,
+      avatar: member.avatar ?? '', // fallback nếu Supabase trả về null
+      badges: Array.isArray(member.badges) ? member.badges : [],
+      title: member.title ?? '',
+      rank: i + 1,
+      totalPoints: member.xp,
+      maxXp: levelData.maxXp,
+      level: levelData.level,
+      levelProgress: levelData.progress,
+      // fallback nếu thiếu trường (giữ UI không crash)
+      coursesCompleted: member.coursesCompleted ?? 0,
+      streak: member.streak ?? 0,
+      joinDate: member.joinDate ?? '',
+      isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
+    };
+  });
 
   // Bổ sung lọc theo Level
   const filteredMembers = membersWithStats.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (member.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
-      (filterType === 'top10' && membersWithStats.indexOf(member) < 10) ||
+      (filterType === 'top10' && member.rank <= 10) ||
       (filterType === 'online' && member.isOnline) ||
       (filterType === 'streak' && member.streak >= 7);
     const matchesLevel = levelFilter ? member.level === levelFilter : true;
@@ -342,7 +211,7 @@ const Members = () => {
         </CardContent>
       </Card>
 
-      {/* Move XPExplanationModal to always be rendered at the end for correct stacking context */}
+      {/* Modal giải thích XP */}
       <XPExplanationModal
         open={showXPModal}
         onOpenChange={setShowXPModal}
