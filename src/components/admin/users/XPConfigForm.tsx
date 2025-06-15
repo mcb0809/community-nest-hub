@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -93,6 +92,7 @@ const XPConfigForm = () => {
       { key: 'write_post', value: 350, description: 'XP earned for writing a post' },
       { key: 'daily_login', value: 100, description: 'XP earned for daily login streak' },
       { key: 'hourly_online', value: 20, description: 'XP earned per hour online' },
+      { key: 'send_message', value: 1, description: 'XP earned for sending a chat message' },
     ];
     setConfigs(defaultConfigs);
   };
@@ -106,6 +106,7 @@ const XPConfigForm = () => {
       'write_post': 'Viết bài',
       'daily_login': 'Đăng nhập hàng ngày',
       'hourly_online': 'Mỗi giờ online',
+      'send_message': 'Gửi tin nhắn Chat',
     };
     return labels[key] || key;
   };
@@ -119,6 +120,7 @@ const XPConfigForm = () => {
       'write_post': '✍️',
       'daily_login': '📅',
       'hourly_online': '⏰',
+      'send_message': '✉️',
     };
     return icons[key] || '⚡';
   };
@@ -167,7 +169,7 @@ const XPConfigForm = () => {
           <h3 className="text-lg font-semibold text-white border-b border-slate-600 pb-2">
             Hoạt động cơ bản
           </h3>
-          {configs.filter(config => ['like', 'comment', 'share', 'write_post', 'complete_course'].includes(config.key)).map((config) => (
+          {configs.filter(config => ['like', 'comment', 'share', 'write_post', 'complete_course', 'send_message'].includes(config.key)).map((config) => (
             <div key={config.key} className="space-y-2">
               <Label htmlFor={config.key} className="text-slate-300 flex items-center space-x-2">
                 <span className="text-lg">{getActionIcon(config.key)}</span>
