@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -40,6 +39,8 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
     try {
       setLoading(true);
       
+      console.log('Fetching registrations for event:', event.id);
+      
       // First, get the registrations
       const { data: registrationsData, error: registrationsError } = await supabase
         .from('event_registrations')
@@ -49,21 +50,44 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
 
       if (registrationsError) throw registrationsError;
 
+      console.log('Raw registrations data:', registrationsData);
+
       // Then, get user emails for each registration
       const transformedData: RegistrationData[] = [];
       
       for (const registration of registrationsData || []) {
         let userEmail = 'N/A';
         
+        console.log('Processing registration:', registration);
+        
         if (registration.user_id) {
+          console.log('Looking up email for user_id:', registration.user_id);
+          
           const { data: profileData, error: profileError } = await supabase
             .from('user_profiles')
             .select('email')
             .eq('id', registration.user_id)
             .single();
           
+          console.log('Profile lookup result:', { profileData, profileError });
+          
           if (!profileError && profileData?.email) {
             userEmail = profileData.email;
+          }
+        } else {
+          // If user_id is null, try to find the user by name (fallback for old registrations)
+          console.log('user_id is null, trying to find by name:', registration.user_name);
+          
+          const { data: profileByName, error: nameError } = await supabase
+            .from('user_profiles')
+            .select('email')
+            .ilike('display_name', registration.user_name)
+            .single();
+          
+          console.log('Profile lookup by name result:', { profileByName, nameError });
+          
+          if (!nameError && profileByName?.email) {
+            userEmail = profileByName.email;
           }
         }
 
@@ -74,6 +98,7 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
         });
       }
 
+      console.log('Final transformed data:', transformedData);
       setRegistrations(transformedData);
     } catch (error) {
       console.error('Error fetching registrations:', error);
