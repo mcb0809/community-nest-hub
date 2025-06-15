@@ -29,13 +29,14 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
 
-  // Ref lưu channel instance để tránh tạo lại
+  // Ref để giữ instance channel
   const channelRef = useRef<any>(null);
 
-  // Hàm fetchLeaderboard không phụ thuộc onlineUsers, truyền vào nếu cần
+  // FETCH leaderboard (offline to prevent infinite effect loops)
   const fetchLeaderboard = useCallback(
-    async (currentOnlineUsers?: Set<string>) => {
-      const onlineSet = currentOnlineUsers || onlineUsers; // fallback
+    async (customOnlineUsers?: Set<string>) => {
+      // Use given set or last snapshot from ref
+      const onlineSet = customOnlineUsers || onlineUsers;
       setLoading(true);
 
       try {
@@ -121,10 +122,10 @@ export function useLeaderboardRealtime() {
         setLoading(false);
       }
     },
-    [levelConfigs, getLevelByNumber, onlineUsers] // onlineUsers trong deps chỉ để tránh stale state, thực tế luôn fetch realtime theo presence event
+    [levelConfigs, getLevelByNumber] // NO onlineUsers here! Prevent loop!
   );
 
-  // Cleanup channel đúng chuẩn
+  // Proper channel cleanup
   const cleanupChannel = useCallback(() => {
     if (channelRef.current) {
       try {
@@ -135,22 +136,22 @@ export function useLeaderboardRealtime() {
     }
   }, []);
 
-  // Main effect: tạo và cleanup channel duy nhất khi user id hoặc levelConfigs đủ dữ liệu.
+  // Only create one channel for this user + this config
   useEffect(() => {
-    // Điều kiện tạo channel realtime leaderboard
+    // Guard: don't setup if no user or no configs
     if (!user?.id || !levelConfigs.length) return;
 
-    // CLEANUP TRƯỚC khi tạo mới (fix triệt để double subscribe)
+    // Always CLEANUP old channel FIRST
     cleanupChannel();
 
-    // Tạo channel mới
+    // Create new channel each time when needed, never two at once
     const channelId = `leaderboard-realtime-${user.id}`;
     const channel = supabase.channel(channelId, { config: { presence: { key: 'user_id' } } });
     channelRef.current = channel;
 
-    fetchLeaderboard(); // Fetch lần đầu
+    fetchLeaderboard(); // Load initial
 
-    // Đăng ký presence
+    // Listen to presence and changes
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -162,7 +163,7 @@ export function useLeaderboardRealtime() {
           });
         });
         setOnlineUsers(onlineUserIds);
-        fetchLeaderboard(onlineUserIds); // update bảng realtime
+        fetchLeaderboard(onlineUserIds); // Keep chart up-to-date
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, () => {
         fetchLeaderboard();
@@ -177,7 +178,7 @@ export function useLeaderboardRealtime() {
         fetchLeaderboard();
       });
 
-    // CHỈ subscribe duy nhất 1 lần cho channel
+    // Only subscribe once per channel instance!
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({
@@ -187,11 +188,12 @@ export function useLeaderboardRealtime() {
       }
     });
 
-    // Cleanup khi component unmount hoặc deps thay đổi
+    // Completely cleanup on change/unmount
     return () => {
       cleanupChannel();
     };
-  }, [user?.id, levelConfigs.length, fetchLeaderboard, cleanupChannel]);
+    // ONLY depend on user.id and levelConfigs!
+  }, [user?.id, levelConfigs, cleanupChannel, fetchLeaderboard]);
 
   return { users, loading };
 }
