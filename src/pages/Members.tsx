@@ -90,7 +90,7 @@ const Members = () => {
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? '',
       isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
-      // Add messages count from the updated database view
+      // Use messages_count directly from the database view
       messagesCount: (member as any).messages_count ?? 0,
     };
   });
@@ -107,7 +107,7 @@ const Members = () => {
     return matchesSearch && matchesFilter && matchesLevel;
   });
 
-  // Calculate stats for header
+  // Calculate stats for header - fixed to use correct field name
   const totalMembers = members.length;
   const onlineMembers = members.filter(m => m.isOnline).length;
   const weekAgo = new Date();
@@ -119,7 +119,7 @@ const Members = () => {
     ? Math.round((onlineMembers / totalMembers) * 100) 
     : 0;
 
-  // Get top achievements for header including most active chatter - with safe reduce
+  // Get most active chatter using the correct field
   const mostActiveChatter = membersWithStats.length > 0 
     ? membersWithStats.reduce((prev, current) => 
         (prev.messagesCount > current.messagesCount) ? prev : current

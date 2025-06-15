@@ -83,7 +83,7 @@ export const useXPActions = () => {
       const xp = await logXPAction(userId, 'send_message', 'Sent a chat message', messageId);
       console.log('Chat message XP logged:', xp);
       
-      // Only show toast if XP was actually earned (avoid spam for 0 XP)
+      // Show toast for XP earned (even if it's small amount)
       if (xp > 0) {
         toast({
           title: "Message sent!",
