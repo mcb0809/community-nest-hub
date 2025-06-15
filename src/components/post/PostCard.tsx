@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Post } from '@/hooks/usePosts';
 import { useAuth } from '@/hooks/useAuth';
+import { useCommunityXP } from '@/hooks/useCommunityXP';
 
 interface PostCardProps {
   post: Post;
@@ -33,8 +34,15 @@ interface PostCardProps {
 
 const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
   const { user, isAdmin } = useAuth();
+  const { handleLike, handleComment, handleShare } = useCommunityXP();
   const isOwner = user?.id === post.user_id;
   const canManage = isOwner || isAdmin();
+
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [commentText, setCommentText] = useState('');
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
@@ -65,6 +73,48 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleLikeClick = async () => {
+    if (!user?.id) return;
+
+    try {
+      await handleLike(post.id);
+      setIsLiked(!isLiked);
+      setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+    } catch (error) {
+      console.error('Error liking post:', error);
+    }
+  };
+
+  const handleCommentClick = () => {
+    setShowCommentInput(!showCommentInput);
+  };
+
+  const handleCommentSubmit = async () => {
+    if (!user?.id || !commentText.trim()) return;
+
+    try {
+      await handleComment(post.id);
+      setCommentCount(prev => prev + 1);
+      setCommentText('');
+      setShowCommentInput(false);
+    } catch (error) {
+      console.error('Error commenting on post:', error);
+    }
+  };
+
+  const handleShareClick = async () => {
+    if (!user?.id) return;
+
+    try {
+      await handleShare(post.id);
+      // Copy post link to clipboard
+      const postUrl = `${window.location.origin}/community#post-${post.id}`;
+      await navigator.clipboard.writeText(postUrl);
+    } catch (error) {
+      console.error('Error sharing post:', error);
+    }
   };
 
   // Extract YouTube videos from content
@@ -295,19 +345,69 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
           </div>
         )}
 
+        {/* Comment Input */}
+        {showCommentInput && (
+          <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-600">
+            <textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Viết bình luận của bạn..."
+              className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 resize-none focus:outline-none focus:border-purple-500"
+              rows={3}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCommentInput(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                Hủy
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCommentSubmit}
+                disabled={!commentText.trim()}
+                className="bg-purple-500 hover:bg-purple-600 text-white"
+              >
+                Đăng
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-between pt-4 border-t border-slate-700">
           <div className="flex items-center space-x-6">
-            <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-red-500/10 hover:text-red-400 text-slate-400 transition-colors">
-              <Heart className="w-4 h-4" />
-              <span className="text-sm">0</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleLikeClick}
+              className={`flex items-center gap-2 transition-colors ${
+                isLiked 
+                  ? 'text-red-400 hover:text-red-300' 
+                  : 'text-slate-400 hover:bg-red-500/10 hover:text-red-400'
+              }`}
+            >
+              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+              <span className="text-sm">{likeCount}</span>
             </Button>
-            <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-blue-500/10 hover:text-blue-400 text-slate-400 transition-colors">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleCommentClick}
+              className="flex items-center gap-2 hover:bg-blue-500/10 hover:text-blue-400 text-slate-400 transition-colors"
+            >
               <MessageCircle className="w-4 h-4" />
-              <span className="text-sm">0</span>
+              <span className="text-sm">{commentCount}</span>
             </Button>
           </div>
-          <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-colors">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleShareClick}
+            className="flex items-center gap-2 hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-colors"
+          >
             <Share2 className="w-4 h-4" />
             Chia sẻ
           </Button>
