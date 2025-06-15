@@ -29,15 +29,12 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
 
-  // Ref để track channel và prevent multiple subscriptions
+  // Use refs to prevent re-subscriptions
   const channelRef = useRef<any>(null);
-  const subscriptionStatusRef = useRef<string>('UNSUBSCRIBED');
+  const isSubscribedRef = useRef(false);
 
-  // Standalone fetch function - NO useCallback, no dependencies
-  const fetchLeaderboard = async (currentOnlineUsers?: Set<string>) => {
-    const onlineSet = currentOnlineUsers || onlineUsers;
-    setLoading(true);
-
+  // Fetch function - completely independent of state
+  const fetchLeaderboard = async () => {
     try {
       const { data: profilesData, error: profilesError } = await supabase
         .from("user_profiles")
@@ -50,6 +47,7 @@ export function useLeaderboardRealtime() {
         `);
 
       if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
         setLoading(false);
         return;
       }
@@ -78,7 +76,6 @@ export function useLeaderboardRealtime() {
         const level = userStats?.level || 1;
         const levelConfig = getLevelByNumber(level);
 
-        // Level progress từ config
         const calculateLevelProgress = (xp: number, currentLevel: number) => {
           if (!levelConfigs.length) return 0;
           const currentLevelConfig = getLevelByNumber(currentLevel);
@@ -102,7 +99,7 @@ export function useLeaderboardRealtime() {
           coursesCompleted: userStats?.courses_completed ?? 0,
           streak: userStats?.current_streak ?? 0,
           badges: [],
-          isOnline: onlineSet.has(profile.id),
+          isOnline: onlineUsers.has(profile.id),
           joinDate: profile.created_at || new Date().toISOString(),
           title: undefined,
           postsCount: postsCounts[profile.id] || 0,
@@ -113,51 +110,39 @@ export function useLeaderboardRealtime() {
       });
 
       mapped.sort((a, b) => b.xp - a.xp);
-
       setUsers(mapped);
       setLoading(false);
     } catch (error) {
+      console.error('Error in fetchLeaderboard:', error);
       setUsers([]);
       setLoading(false);
     }
   };
 
-  // Cleanup function
-  const cleanupChannel = () => {
-    if (channelRef.current && subscriptionStatusRef.current !== 'UNSUBSCRIBED') {
-      try {
-        channelRef.current.untrack?.();
-        supabase.removeChannel(channelRef.current);
-        subscriptionStatusRef.current = 'UNSUBSCRIBED';
-      } catch (error) {
-        console.log('Channel cleanup error:', error);
-      }
-      channelRef.current = null;
-    }
-  };
-
-  // Setup realtime ONCE when user and config are ready
+  // Setup realtime subscription - only once when user and levelConfigs are ready
   useEffect(() => {
-    if (!user?.id || !levelConfigs.length) {
-      setLoading(false);
+    if (!user?.id || !levelConfigs.length || isSubscribedRef.current) {
+      if (!user?.id || !levelConfigs.length) {
+        setLoading(false);
+      }
       return;
     }
 
-    // Cleanup any existing channel first
-    cleanupChannel();
+    console.log('Setting up leaderboard realtime subscription...');
 
     // Initial fetch
     fetchLeaderboard();
 
-    // Create single channel with unique ID
-    const channelId = `leaderboard-${user.id}-${Date.now()}`;
-    const channel = supabase.channel(channelId, { 
+    // Create channel with unique identifier
+    const channelName = `leaderboard-${user.id}-${Date.now()}`;
+    const channel = supabase.channel(channelName, { 
       config: { presence: { key: 'user_id' } } 
     });
     
     channelRef.current = channel;
+    isSubscribedRef.current = true;
 
-    // Setup event listeners BEFORE subscribing
+    // Setup all event listeners before subscribing
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -169,7 +154,13 @@ export function useLeaderboardRealtime() {
           });
         });
         setOnlineUsers(onlineUserIds);
-        fetchLeaderboard(onlineUserIds);
+        // Update users with new online status
+        setUsers(prevUsers => 
+          prevUsers.map(user => ({
+            ...user,
+            isOnline: onlineUserIds.has(user.id)
+          }))
+        );
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, () => {
         fetchLeaderboard();
@@ -184,27 +175,33 @@ export function useLeaderboardRealtime() {
         fetchLeaderboard();
       });
 
-    // Subscribe ONLY ONCE
-    if (subscriptionStatusRef.current === 'UNSUBSCRIBED') {
-      subscriptionStatusRef.current = 'SUBSCRIBING';
+    // Subscribe and track presence
+    channel.subscribe(async (status) => {
+      console.log('Leaderboard subscription status:', status);
       
-      channel.subscribe(async (status) => {
-        subscriptionStatusRef.current = status;
-        
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: user.id,
-            online_at: new Date().toISOString()
-          });
-        }
-      });
-    }
+      if (status === 'SUBSCRIBED') {
+        await channel.track({
+          user_id: user.id,
+          online_at: new Date().toISOString()
+        });
+      }
+    });
 
-    // Cleanup on unmount
+    // Cleanup function
     return () => {
-      cleanupChannel();
+      console.log('Cleaning up leaderboard subscription...');
+      if (channelRef.current) {
+        try {
+          channelRef.current.untrack?.();
+          supabase.removeChannel(channelRef.current);
+        } catch (error) {
+          console.log('Channel cleanup error:', error);
+        }
+        channelRef.current = null;
+      }
+      isSubscribedRef.current = false;
     };
-  }, [user?.id, levelConfigs.length]); // MINIMAL dependencies only
+  }, [user?.id, levelConfigs.length]); // Minimal, stable dependencies
 
   return { users, loading };
 }
