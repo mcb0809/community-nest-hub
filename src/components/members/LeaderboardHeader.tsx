@@ -8,7 +8,8 @@ import {
   Medal, 
   TrendingUp,
   Users,
-  Calendar
+  Calendar,
+  FileText
 } from 'lucide-react';
 
 interface LeaderboardHeaderProps {
@@ -57,7 +58,7 @@ const LeaderboardHeader = ({
     }
   ];
 
-  // Default achievements if no topUsers provided
+  // Default achievements with posts instead of messages
   const defaultAchievements = [
     {
       icon: Crown,
@@ -66,10 +67,10 @@ const LeaderboardHeader = ({
       color: "text-yellow-400"
     },
     {
-      icon: TrendingUp,
+      icon: FileText,
       name: topUsers[1]?.name || "Chưa có dữ liệu", 
       achievement: topUsers[1]?.achievement || "Đang cập nhật...",
-      color: "text-green-400"
+      color: "text-blue-400"
     },
     {
       icon: Trophy,

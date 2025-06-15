@@ -108,7 +108,7 @@ const Members = () => {
     return matchesSearch && matchesFilter && matchesLevel;
   });
 
-  // Calculate stats for header - fixed to use correct field name
+  // Calculate stats for header - updated to use posts count
   const totalMembers = members.length;
   const onlineMembers = members.filter(m => m.isOnline).length;
   const weekAgo = new Date();
@@ -120,10 +120,10 @@ const Members = () => {
     ? Math.round((onlineMembers / totalMembers) * 100) 
     : 0;
 
-  // Get most active chatter using the correct field
-  const mostActiveChatter = membersWithStats.length > 0 
+  // Get most active poster using posts_count
+  const mostActivePoster = membersWithStats.length > 0 
     ? membersWithStats.reduce((prev, current) => 
-        (prev.messagesCount > current.messagesCount) ? prev : current
+        ((prev as any).posts_count || 0) > ((current as any).posts_count || 0) ? prev : current
       )
     : null;
 
@@ -134,9 +134,9 @@ const Members = () => {
       value: filteredMembers[0]?.totalPoints || 0
     },
     {
-      name: mostActiveChatter?.name || "Chưa có dữ liệu",
-      achievement: `${mostActiveChatter?.messagesCount || 0} tin nhắn đã gửi`,
-      value: mostActiveChatter?.messagesCount || 0
+      name: mostActivePoster?.name || "Chưa có dữ liệu",
+      achievement: `${(mostActivePoster as any)?.posts_count || 0} bài viết đã đăng`,
+      value: (mostActivePoster as any)?.posts_count || 0
     },
     {
       name: membersWithStats.filter(m => m.isOnline).length > 0 ? `${membersWithStats.filter(m => m.isOnline).length} thành viên` : "Chưa có dữ liệu",
@@ -167,7 +167,7 @@ const Members = () => {
         topUsers={topUsers}
       />
 
-      {/* Section Highlight Tuần này - Updated to remove messages highlight */}
+      {/* Section Highlight Tuần này - Updated to show posts instead of messages */}
       <div className="flex flex-col md:flex-row items-center justify-center gap-4">
         <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-400/20 to-purple-500/20 rounded-xl py-3 px-4">
           <Trophy className="w-5 h-5 text-yellow-400" />
@@ -175,6 +175,13 @@ const Members = () => {
             {filteredMembers[0]?.name || 'Chưa có dữ liệu'}
           </span>
           <span className="text-sm text-slate-400">– Rank #1 với {filteredMembers[0]?.totalPoints?.toLocaleString() || 0} XP</span>
+        </div>
+        <div className="flex items-center gap-2 bg-gradient-to-r from-blue-400/20 to-cyan-500/20 rounded-xl py-3 px-4">
+          <FileText className="w-5 h-5 text-blue-400" />
+          <span className="text-white font-semibold">
+            {mostActivePoster?.name || 'Chưa có dữ liệu'}
+          </span>
+          <span className="text-sm text-slate-400">– {(mostActivePoster as any)?.posts_count || 0} bài viết</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-xl py-3 px-4">
           <Crown className="w-5 h-5 text-purple-400" />
