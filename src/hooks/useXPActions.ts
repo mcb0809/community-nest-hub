@@ -77,6 +77,12 @@ export const useXPActions = () => {
     return xp;
   }, []);
 
+  const logChatMessage = useCallback(async (userId: string, messageId?: string) => {
+    const xp = await logXPAction(userId, 'send_message', 'Sent a chat message', messageId);
+    // Không hiển thị toast cho tin nhắn chat để tránh spam
+    return xp;
+  }, []);
+
   return {
     logLike,
     logComment,
@@ -85,5 +91,6 @@ export const useXPActions = () => {
     logWritePost,
     logDailyLogin,
     logOnlineTime,
+    logChatMessage,
   };
 };

@@ -17,6 +17,7 @@ interface UserWithStats {
     level: number;
     posts_count: number;
     courses_completed: number;
+    messages_count: number;
     last_activity: string | null;
   } | null;
 }
@@ -123,7 +124,10 @@ const UserTable = ({ users, isLoading, onUserSelect }: UserTableProps) => {
                 <div className="space-y-1">
                   <div className="flex items-center space-x-4 text-sm">
                     <span className="text-slate-300">{user.user_stats.posts_count} bài viết</span>
-                    <span className="text-slate-300">{user.user_stats.courses_completed} khóa học</span>
+                    <span className="text-slate-300">{user.user_stats.messages_count} tin nhắn</span>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {user.user_stats.courses_completed} khóa học hoàn thành
                   </div>
                 </div>
               ) : (

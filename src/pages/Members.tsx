@@ -11,7 +11,8 @@ import {
   Crown,
   TrendingUp,
   Zap,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from 'lucide-react';
 import { ChevronDown } from "lucide-react";
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,6 +41,7 @@ const filterOptions = [
   { value: 'top10', label: 'Top 10', icon: Crown },
   { value: 'online', label: 'Đang online', icon: TrendingUp },
   { value: 'streak', label: 'Streak cao', icon: Zap },
+  { value: 'chatters', label: 'Hay chat', icon: MessageSquare },
 ];
 
 const Members = () => {
@@ -89,16 +91,19 @@ const Members = () => {
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? '',
       isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
+      // Add messages count from the data
+      messagesCount: (member as any).messages_count ?? 0,
     };
   });
 
-  // Filter by Level
+  // Filter by Level and new filter for chatters
   const filteredMembers = membersWithStats.filter(member => {
     const matchesSearch = (member.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
       (filterType === 'top10' && member.rank <= 10) ||
       (filterType === 'online' && member.isOnline) ||
-      (filterType === 'streak' && member.streak >= 7);
+      (filterType === 'streak' && member.streak >= 7) ||
+      (filterType === 'chatters' && member.messagesCount >= 50);
     const matchesLevel = levelFilter ? member.level === levelFilter : true;
     return matchesSearch && matchesFilter && matchesLevel;
   });
@@ -115,7 +120,11 @@ const Members = () => {
     ? Math.round((onlineMembers / totalMembers) * 100) 
     : 0;
 
-  // Get top achievements for header
+  // Get top achievements for header including most active chatter
+  const mostActiveChatter = membersWithStats.reduce((prev, current) => 
+    (prev.messagesCount > current.messagesCount) ? prev : current
+  );
+
   const topUsers = [
     {
       name: filteredMembers[0]?.name || "Chưa có dữ liệu",
@@ -123,9 +132,9 @@ const Members = () => {
       value: filteredMembers[0]?.totalPoints || 0
     },
     {
-      name: membersWithStats.find(m => m.streak >= 7)?.name || "Chưa có dữ liệu",
-      achievement: `${membersWithStats.find(m => m.streak >= 7)?.streak || 0} ngày streak`,
-      value: membersWithStats.find(m => m.streak >= 7)?.streak || 0
+      name: mostActiveChatter?.name || "Chưa có dữ liệu",
+      achievement: `${mostActiveChatter?.messagesCount || 0} tin nhắn đã gửi`,
+      value: mostActiveChatter?.messagesCount || 0
     },
     {
       name: membersWithStats.filter(m => m.isOnline).length > 0 ? `${membersWithStats.filter(m => m.isOnline).length} thành viên` : "Chưa có dữ liệu",
@@ -166,11 +175,11 @@ const Members = () => {
           <span className="text-sm text-slate-400">– Rank #1 với {filteredMembers[0]?.totalPoints?.toLocaleString() || 0} XP</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-green-400/20 to-cyan-500/20 rounded-xl py-3 px-4">
-          <Zap className="w-5 h-5 text-green-400" />
+          <MessageSquare className="w-5 h-5 text-green-400" />
           <span className="text-white font-semibold">
-            {filteredMembers.find(m => m.streak >= 7)?.name || 'Chưa có dữ liệu'}
+            {mostActiveChatter?.name || 'Chưa có dữ liệu'}
           </span>
-          <span className="text-sm text-slate-400">– {filteredMembers.find(m => m.streak >= 7)?.streak || 0} ngày streak</span>
+          <span className="text-sm text-slate-400">– {mostActiveChatter?.messagesCount || 0} tin nhắn</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-xl py-3 px-4">
           <Crown className="w-5 h-5 text-purple-400" />
@@ -284,7 +293,7 @@ const Members = () => {
           <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
           <h3 className="text-2xl font-bold text-white mb-2">Tham gia cuộc đua!</h3>
           <p className="text-slate-400 mb-6 max-w-md mx-auto">
-            Hoàn thành khóa học, tích lũy điểm và leo lên bảng xếp hạng. Bạn có thể đánh bại được những người đứng đầu không?
+            Hoàn thành khóa học, tích lũy điểm và leo lên bảng xếp hạng. Gửi tin nhắn trong chat để tích lũy thêm XP!
           </p>
           <Button className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white font-semibold px-8 py-3">
             Bắt đầu học ngay

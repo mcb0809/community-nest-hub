@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useXPActions } from '@/hooks/useXPActions';
 
 export interface Channel {
   id: string;
@@ -46,6 +47,7 @@ export const useChat = () => {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
+  const { logChatMessage } = useXPActions();
 
   // Load channels
   useEffect(() => {
@@ -418,6 +420,9 @@ export const useChat = () => {
           ? { ...optimisticMessage, id: messageData.id }
           : msg
       ));
+
+      // Log XP for sending message
+      await logChatMessage(user.id, messageData.id);
 
       // Add attachments if any
       if (attachments && attachments.length > 0) {

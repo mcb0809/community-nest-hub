@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import UserTable from '@/components/admin/users/UserTable';
 import UserDetailDrawer from '@/components/admin/users/UserDetailDrawer';
 import XPConfigForm from '@/components/admin/users/XPConfigForm';
-import XPLogChart from '@/components/admin/users/XPLogChart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,6 +24,7 @@ interface UserWithStats {
     level: number;
     posts_count: number;
     courses_completed: number;
+    messages_count: number;
     last_activity: string | null;
   } | null;
 }
@@ -34,7 +34,7 @@ const AdminUsers = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  // Fetch users with stats
+  // Fetch users with stats including message count
   const { data: rawUsers = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
@@ -61,6 +61,7 @@ const AdminUsers = () => {
       level: user.level || 1,
       posts_count: user.posts_count || 0,
       courses_completed: user.courses_completed || 0,
+      messages_count: user.messages_count || 0,
       last_activity: user.last_activity,
     }
   }));
