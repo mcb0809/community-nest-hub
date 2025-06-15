@@ -148,6 +148,68 @@ const sendRegistrationWebhook = async (
   }
 };
 
+const sendEventUpdateWebhook = async (event: Event) => {
+  try {
+    console.log('Sending webhook for updated event:', event.id);
+
+    const webhookUrl = 'https://mcbaivn.tino.page/webhook/updateevent';
+    const credentials = btoa('MCBAIVN:Machbang8920!');
+
+    // Create event link (assuming you have a frontend URL structure)
+    const eventLink = `${window.location.origin}/events/${event.id}`;
+
+    const payload = {
+      event_id: event.id,
+      event_name: (event.title || '').trim(),
+      event_time: `${event.date} ${event.time}`.trim(),
+      event_link: eventLink,
+      event_type: (event.type || '').trim(),
+      event_status: (event.status || '').trim(),
+      event_format: (event.format || '').trim(),
+      duration: event.duration,
+      description: (event.description || '').trim(),
+      max_attendees: event.max_attendees,
+      instructor: (event.instructor || '').trim(),
+      location: event.format === 'offline' ? (event.location || '').trim() : null,
+      meeting_link: event.format === 'online' ? (event.meeting_link || '').trim() : null,
+      tags: event.tags || [],
+      updated_at: event.updated_at,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log('Event update payload to send:', JSON.stringify(payload, null, 2));
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Basic ${credentials}`,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    console.log('Event update response status:', response.status);
+
+    if (response.ok) {
+      console.log('✅ Event update webhook sent successfully');
+      const responseData = await response.text();
+      console.log('Event update response data:', responseData);
+    } else {
+      console.error('❌ Event update webhook failed with status:', response.status);
+      const errorText = await response.text();
+      console.error('Event update error response:', errorText);
+    }
+  } catch (error) {
+    console.error('❌ Error sending event update webhook:', error);
+    console.error('Event update error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+  }
+};
+
 export const useEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,6 +312,9 @@ export const useEvents = () => {
       };
 
       setEvents(prev => prev.map(event => event.id === id ? transformedData : event));
+      // Send the webhook after successful update
+      await sendEventUpdateWebhook(transformedData);
+
       toast({
         title: "Success",
         description: "Event updated successfully",
