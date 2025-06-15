@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -30,12 +29,9 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
   
-  // Single subscription management
-  const subscriptionManagerRef = useRef<{
-    channel: any;
-    isActive: boolean;
-    channelId: string;
-  } | null>(null);
+  // Single subscription reference to prevent multiple subscriptions
+  const subscriptionRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   const fetchLeaderboard = useCallback(async () => {
     console.log("Fetching leaderboard data...");
@@ -155,27 +151,26 @@ export function useLeaderboardRealtime() {
 
   // Cleanup function
   const cleanupSubscription = useCallback(() => {
-    if (subscriptionManagerRef.current) {
-      console.log("Cleaning up subscription for channel:", subscriptionManagerRef.current.channelId);
+    if (subscriptionRef.current) {
+      console.log("Cleaning up existing subscription");
       try {
-        const { channel } = subscriptionManagerRef.current;
-        if (channel) {
-          channel.untrack?.();
-          supabase.removeChannel(channel);
-        }
+        subscriptionRef.current.untrack?.();
+        supabase.removeChannel(subscriptionRef.current);
       } catch (error) {
         console.warn('Error during subscription cleanup:', error);
       }
-      subscriptionManagerRef.current = null;
+      subscriptionRef.current = null;
+      isSubscribedRef.current = false;
     }
   }, []);
 
-  // Setup subscription function
-  const setupSubscription = useCallback(() => {
-    if (!user?.id || !levelConfigs.length) {
-      console.log("Cannot setup subscription - missing user or level configs");
+  useEffect(() => {
+    // Only setup subscription once when user and level configs are available
+    if (!user?.id || !levelConfigs.length || isSubscribedRef.current) {
       return;
     }
+
+    console.log("Setting up leaderboard subscription for user:", user.id);
 
     // Clean up any existing subscription first
     cleanupSubscription();
@@ -185,18 +180,13 @@ export function useLeaderboardRealtime() {
     
     // Create unique channel
     const channelId = `leaderboard-realtime-${user.id}-${Date.now()}`;
-    console.log("Setting up subscription for channel:", channelId);
+    console.log("Creating channel:", channelId);
     
     const channel = supabase.channel(channelId, {
       config: { presence: { key: 'user_id' } }
     });
 
-    // Store subscription info
-    subscriptionManagerRef.current = {
-      channel,
-      isActive: false,
-      channelId
-    };
+    subscriptionRef.current = channel;
 
     // Set up channel subscriptions
     channel
@@ -232,31 +222,25 @@ export function useLeaderboardRealtime() {
         fetchLeaderboard();
       })
       .subscribe(async (status) => {
-        console.log('Channel subscription status for', channelId, ':', status);
+        console.log('Channel subscription status:', status);
         
-        if (subscriptionManagerRef.current) {
-          if (status === 'SUBSCRIBED') {
-            subscriptionManagerRef.current.isActive = true;
-            // Track user presence
-            await channel.track({
-              user_id: user.id,
-              online_at: new Date().toISOString(),
-            });
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            subscriptionManagerRef.current.isActive = false;
-          }
+        if (status === 'SUBSCRIBED') {
+          isSubscribedRef.current = true;
+          // Track user presence
+          await channel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString(),
+          });
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          isSubscribedRef.current = false;
         }
       });
-  }, [user?.id, levelConfigs.length, fetchLeaderboard, cleanupSubscription]);
 
-  useEffect(() => {
-    setupSubscription();
-    
     // Cleanup on unmount
     return () => {
       cleanupSubscription();
     };
-  }, [setupSubscription]);
+  }, [user?.id, levelConfigs.length]); // Only depend on stable values
 
   return { users, loading };
 }
