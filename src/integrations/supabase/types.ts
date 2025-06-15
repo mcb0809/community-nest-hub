@@ -636,6 +636,109 @@ export type Database = {
         }
         Relationships: []
       }
+      user_stats: {
+        Row: {
+          courses_completed: number
+          created_at: string
+          id: string
+          last_activity: string | null
+          level: number
+          posts_count: number
+          streak_days: number
+          total_xp: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          courses_completed?: number
+          created_at?: string
+          id?: string
+          last_activity?: string | null
+          level?: number
+          posts_count?: number
+          streak_days?: number
+          total_xp?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          courses_completed?: number
+          created_at?: string
+          id?: string
+          last_activity?: string | null
+          level?: number
+          posts_count?: number
+          streak_days?: number
+          total_xp?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      xp_config: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      xp_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          description: string | null
+          id: string
+          user_id: string | null
+          xp_earned: number
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          user_id?: string | null
+          xp_earned: number
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          user_id?: string | null
+          xp_earned?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xp_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youtube_feature: {
         Row: {
           created_at: string
@@ -668,7 +771,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_level: {
+        Args: { total_xp: number }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, UserPlus, Edit, Trash2, Shield, Mail, Calendar, Trophy, Users } from 'lucide-react';
+import { Search, Filter, UserPlus, Edit, Trash2, Shield, Mail, Calendar, Trophy, Users, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 import EditUserModal from '@/components/admin/EditUserModal';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
+import UserTable from '@/components/admin/users/UserTable';
+import UserDetailDrawer from '@/components/admin/users/UserDetailDrawer';
+import XPConfigForm from '@/components/admin/users/XPConfigForm';
 
 interface UserProfile {
   id: string;
@@ -24,14 +26,26 @@ interface UserProfile {
   updated_at: string;
 }
 
+interface UserWithStats extends UserProfile {
+  user_stats?: {
+    total_xp: number;
+    level: number;
+    posts_count: number;
+    courses_completed: number;
+    last_activity: string | null;
+  } | null;
+}
+
 const AdminUsers = () => {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<UserWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('management');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
   const { toast } = useToast();
 
   // Mock gamification data for members tab
@@ -122,13 +136,30 @@ const AdminUsers = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: usersData, error: usersError } = await supabase
         .from('user_profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setUsers(data || []);
+      if (usersError) throw usersError;
+
+      // Fetch user stats for each user
+      const usersWithStats = await Promise.all(
+        (usersData || []).map(async (user) => {
+          const { data: stats } = await supabase
+            .from('user_stats')
+            .select('total_xp, level, posts_count, courses_completed, last_activity')
+            .eq('user_id', user.id)
+            .single();
+
+          return {
+            ...user,
+            user_stats: stats
+          };
+        })
+      );
+
+      setUsers(usersWithStats);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -175,10 +206,15 @@ const AdminUsers = () => {
 
   const handleUserUpdated = (updatedUser: UserProfile) => {
     setUsers(users.map(user => 
-      user.id === updatedUser.id ? updatedUser : user
+      user.id === updatedUser.id ? { ...user, ...updatedUser } : user
     ));
     
     fetchUsers();
+  };
+
+  const handleViewDetails = (userId: string) => {
+    setSelectedUserId(userId);
+    setIsDetailDrawerOpen(true);
   };
 
   const filteredUsers = users.filter(user => {
@@ -211,7 +247,7 @@ const AdminUsers = () => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Quản lý người dùng</h1>
-          <p className="text-slate-400">Quản lý tài khoản, quyền người dùng và bảng xếp hạng trong hệ thống</p>
+          <p className="text-slate-400">Quản lý tài khoản, quyền người dùng, bảng xếp hạng và cấu hình XP</p>
         </div>
         
         <Button className="bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600">
@@ -222,7 +258,7 @@ const AdminUsers = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-slate-800/50 border border-slate-700">
+        <TabsList className="grid w-full grid-cols-3 bg-slate-800/50 border border-slate-700">
           <TabsTrigger 
             value="management" 
             className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-500 data-[state=active]:to-orange-500 data-[state=active]:text-white"
@@ -236,6 +272,13 @@ const AdminUsers = () => {
           >
             <Trophy className="w-4 h-4 mr-2" />
             Bảng xếp hạng
+          </TabsTrigger>
+          <TabsTrigger 
+            value="xp-config"
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Cấu hình XP
           </TabsTrigger>
         </TabsList>
 
@@ -328,104 +371,7 @@ const AdminUsers = () => {
           {/* Users Table */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700">
-                    <TableHead className="text-slate-300">Người dùng</TableHead>
-                    <TableHead className="text-slate-300">Email</TableHead>
-                    <TableHead className="text-slate-300">Quyền</TableHead>
-                    <TableHead className="text-slate-300">Ngày tạo</TableHead>
-                    <TableHead className="text-slate-300">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id} className="border-slate-700 hover:bg-slate-700/30">
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-orange-600 rounded-full flex items-center justify-center">
-                            {user.avatar_url ? (
-                              <img
-                                src={user.avatar_url}
-                                alt={user.display_name}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <span className="text-white font-semibold text-sm">
-                                {user.display_name.charAt(0).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-white">{user.display_name}</p>
-                            <p className="text-sm text-slate-400 truncate max-w-[200px]">{user.id}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-slate-300">
-                        {user.email ? (
-                          <div className="max-w-[200px]">
-                            <p className="truncate" title={user.email}>{user.email}</p>
-                          </div>
-                        ) : (
-                          <span className="text-slate-500 italic">Chưa có email</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={roleColors[user.role as keyof typeof roleColors] || 'bg-gray-500/20 text-gray-400'}>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-slate-300">
-                        {new Date(user.created_at).toLocaleDateString('vi-VN')}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditUser(user)}
-                            className="text-slate-400 hover:text-white hover:bg-slate-700"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white">
-                                <Shield className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="bg-slate-800 border-slate-600">
-                              <DropdownMenuItem
-                                onClick={() => updateUserRole(user.id, 'admin')}
-                                className="text-white hover:bg-slate-700"
-                              >
-                                <Shield className="w-4 h-4 mr-2" />
-                                Đặt làm Admin
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => updateUserRole(user.id, 'moderator')}
-                                className="text-white hover:bg-slate-700"
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Đặt làm Moderator
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => updateUserRole(user.id, 'member')}
-                                className="text-white hover:bg-slate-700"
-                              >
-                                <Mail className="w-4 h-4 mr-2" />
-                                Đặt làm Member
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <UserTable users={filteredUsers} onViewDetails={handleViewDetails} />
             </CardContent>
           </Card>
 
@@ -449,6 +395,11 @@ const AdminUsers = () => {
             ))}
           </div>
         </TabsContent>
+
+        {/* XP Configuration Tab */}
+        <TabsContent value="xp-config" className="space-y-6">
+          <XPConfigForm />
+        </TabsContent>
       </Tabs>
 
       <EditUserModal
@@ -456,6 +407,12 @@ const AdminUsers = () => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         onUserUpdated={handleUserUpdated}
+      />
+
+      <UserDetailDrawer
+        userId={selectedUserId}
+        isOpen={isDetailDrawerOpen}
+        onClose={() => setIsDetailDrawerOpen(false)}
       />
     </div>
   );
