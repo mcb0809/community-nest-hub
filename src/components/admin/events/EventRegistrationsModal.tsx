@@ -39,26 +39,40 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // First, get the registrations
+      const { data: registrationsData, error: registrationsError } = await supabase
         .from('event_registrations')
-        .select(`
-          user_name,
-          registered_at,
-          user_id,
-          user_profiles (
-            email
-          )
-        `)
+        .select('user_name, registered_at, user_id')
         .eq('event_id', event.id)
         .order('registered_at', { ascending: true });
 
-      if (error) throw error;
+      if (registrationsError) throw registrationsError;
 
-      const transformedData: RegistrationData[] = data.map(reg => ({
-        user_name: reg.user_name,
-        registered_at: reg.registered_at,
-        user_email: reg.user_profiles?.email || 'N/A'
-      }));
+      // Then, get user emails for each registration
+      const transformedData: RegistrationData[] = [];
+      
+      for (const registration of registrationsData || []) {
+        let userEmail = 'N/A';
+        
+        if (registration.user_id) {
+          const { data: profileData, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('email')
+            .eq('id', registration.user_id)
+            .single();
+          
+          if (!profileError && profileData?.email) {
+            userEmail = profileData.email;
+          }
+        }
+
+        transformedData.push({
+          user_name: registration.user_name,
+          registered_at: registration.registered_at,
+          user_email: userEmail
+        });
+      }
 
       setRegistrations(transformedData);
     } catch (error) {
