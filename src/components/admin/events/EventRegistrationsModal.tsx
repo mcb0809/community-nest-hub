@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Users, Mail, Calendar, X } from 'lucide-react';
 import { Event } from '@/hooks/useEvents';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EventRegistrationsModalProps {
   event: Event | null;
@@ -13,11 +14,61 @@ interface EventRegistrationsModalProps {
   onClose: () => void;
 }
 
+interface RegistrationData {
+  user_name: string;
+  registered_at: string;
+  user_email?: string;
+}
+
 const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({ 
   event, 
   isOpen, 
   onClose 
 }) => {
+  const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (event && isOpen) {
+      fetchRegistrations();
+    }
+  }, [event, isOpen]);
+
+  const fetchRegistrations = async () => {
+    if (!event) return;
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('event_registrations')
+        .select(`
+          user_name,
+          registered_at,
+          user_id,
+          user_profiles (
+            email
+          )
+        `)
+        .eq('event_id', event.id)
+        .order('registered_at', { ascending: true });
+
+      if (error) throw error;
+
+      const transformedData: RegistrationData[] = data.map(reg => ({
+        user_name: reg.user_name,
+        registered_at: reg.registered_at,
+        user_email: reg.user_profiles?.email || 'N/A'
+      }));
+
+      setRegistrations(transformedData);
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
+      setRegistrations([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!event) return null;
 
   const formatDate = (dateString: string) => {
@@ -25,6 +76,16 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
       year: 'numeric',
       month: 'long',
       day: 'numeric'
+    });
+  };
+
+  const formatRegistrationDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -59,7 +120,7 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
               </div>
               <div className="flex items-center gap-1">
                 <Users className="w-3 h-3" />
-                {event.registered}/{event.max_attendees} người tham gia
+                {registrations.length}/{event.max_attendees} người tham gia
               </div>
             </div>
           </div>
@@ -68,17 +129,21 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h4 className="text-lg font-medium text-white">
-                Người đã đăng ký ({event.registered_users?.length || 0})
+                Người đã đăng ký ({registrations.length})
               </h4>
               <Badge 
-                variant={event.registered >= event.max_attendees ? "destructive" : "default"}
+                variant={registrations.length >= event.max_attendees ? "destructive" : "default"}
                 className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
               >
-                {event.registered >= event.max_attendees ? 'Đã đầy' : 'Còn chỗ'}
+                {registrations.length >= event.max_attendees ? 'Đã đầy' : 'Còn chỗ'}
               </Badge>
             </div>
 
-            {event.registered_users && event.registered_users.length > 0 ? (
+            {loading ? (
+              <div className="text-center py-8 text-slate-400">
+                Đang tải...
+              </div>
+            ) : registrations.length > 0 ? (
               <div className="border border-slate-700 rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
@@ -86,26 +151,32 @@ const EventRegistrationsModal: React.FC<EventRegistrationsModalProps> = ({
                       <TableHead className="text-slate-300">STT</TableHead>
                       <TableHead className="text-slate-300">Tên người tham gia</TableHead>
                       <TableHead className="text-slate-300">Email</TableHead>
+                      <TableHead className="text-slate-300">Ngày đăng ký</TableHead>
                       <TableHead className="text-slate-300">Trạng thái</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {event.registered_users.map((userName, index) => (
+                    {registrations.map((registration, index) => (
                       <TableRow key={index} className="border-slate-700 hover:bg-slate-700/50">
                         <TableCell className="text-slate-300">{index + 1}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                              {userName.charAt(0).toUpperCase()}
+                              {registration.user_name.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-white">{userName}</span>
+                            <span className="text-white">{registration.user_name}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-slate-300">
                             <Mail className="w-3 h-3" />
-                            <span>N/A</span>
+                            <span>{registration.user_email}</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-slate-300">
+                            {formatRegistrationDate(registration.registered_at)}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
