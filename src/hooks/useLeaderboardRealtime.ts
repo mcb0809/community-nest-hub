@@ -243,7 +243,7 @@ export function useLeaderboardRealtime() {
     return () => {
       cleanupChannel();
     };
-  }, [user?.id, levelConfigs.length]); // Simplified dependencies
+  }, [user?.id, levelConfigs.length]); // Removed fetchLeaderboard from dependencies
 
   return { users, loading };
 }
