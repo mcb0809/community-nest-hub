@@ -1,113 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { Channel, Message } from '@/types';
 import { useXPActions } from './useXPActions';
 
-export interface Message {
-  id: string;
-  content: string;
-  user_id: string;
-  channel_id: string;
-  created_at: string;
-  updated_at?: string;
-  reactions?: Record<string, string[]>;
-  reply_to?: string;
-  user_profiles?: {
-    display_name: string;
-    avatar_url?: string;
-  };
-  message_attachments?: Array<{
-    id: string;
-    file_name: string;
-    file_url: string;
-    file_type: string;
-    file_size: number;
-  }>;
+export interface UnreadCounts {
+  [channelId: string]: number;
 }
 
-export interface Channel {
-  id: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  created_at: string;
-  updated_at?: string;
-  created_by?: string;
-}
-
-export const useChat = (channelId?: string) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+export const useChat = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [selectedChannel, setSelectedChannel] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const { user, userProfile } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState<UnreadCounts>({});
+  const { user, isAdmin } = useAuth();
+  
   const { logChatMessage } = useXPActions();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const fetchMessages = async () => {
-    if (!channelId && !selectedChannel) return;
-    const targetChannelId = channelId || selectedChannel;
-    setLoading(true);
-    try {
-      // Fetch messages and user profiles separately to avoid relationship issues
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('channel_id', targetChannelId)
-        .order('created_at', { ascending: true });
-
-      if (messagesError) throw messagesError;
-
-      // Fetch user profiles separately
-      const userIds = [...new Set(messagesData?.map(msg => msg.user_id) || [])];
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('user_profiles')
-        .select('id, display_name, avatar_url, email')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.warn('Could not fetch user profiles:', profilesError);
-      }
-
-      // Fetch attachments separately
-      const messageIds = messagesData?.map(msg => msg.id) || [];
-      const { data: attachmentsData, error: attachmentsError } = await supabase
-        .from('message_attachments')
-        .select('*')
-        .in('message_id', messageIds);
-
-      if (attachmentsError) {
-        console.warn('Could not fetch attachments:', attachmentsError);
-      }
-
-      // Combine data
-      const transformedMessages: Message[] = (messagesData || []).map((msg: any) => {
-        const userProfile = profilesData?.find(p => p.id === msg.user_id);
-        const attachments = attachmentsData?.filter(att => att.message_id === msg.id) || [];
-        
-        return {
-          ...msg,
-          reactions: msg.reactions || {},
-          user_profiles: userProfile ? {
-            display_name: userProfile.display_name,
-            avatar_url: userProfile.avatar_url
-          } : undefined,
-          message_attachments: attachments
-        };
-      });
-      
-      setMessages(transformedMessages);
-      console.log('Messages fetched successfully:', transformedMessages.length);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchChannels = async () => {
+  const fetchChannels = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -115,307 +27,110 @@ export const useChat = (channelId?: string) => {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setChannels(data || []);
-      
-      // Set first channel as selected if none selected
-      if (data && data.length > 0 && !selectedChannel) {
-        setSelectedChannel(data[0].id);
+      if (error) {
+        setError(error.message);
+      } else {
+        setChannels(data || []);
       }
-    } catch (error) {
-      console.error('Error fetching channels:', error);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  }
-
-  // Handle real-time message updates
-  const handleRealtimeMessage = async (payload: any) => {
-    console.log('Change received!', payload);
-    
-    if (payload.eventType === 'INSERT') {
-      // Fetch user profile for the new message
-      const { data: userProfile } = await supabase
-        .from('user_profiles')
-        .select('id, display_name, avatar_url, email')
-        .eq('id', payload.new.user_id)
-        .single();
-
-      // Fetch attachments for the new message
-      const { data: attachments } = await supabase
-        .from('message_attachments')
-        .select('*')
-        .eq('message_id', payload.new.id);
-
-      const newMessage: Message = {
-        ...payload.new,
-        reactions: payload.new.reactions || {},
-        user_profiles: userProfile ? {
-          display_name: userProfile.display_name,
-          avatar_url: userProfile.avatar_url
-        } : undefined,
-        message_attachments: attachments || []
-      };
-
-      console.log('Adding new message to state:', newMessage);
-
-      // Add new message to existing messages
-      setMessages(prev => {
-        // Check if message already exists to avoid duplicates
-        if (prev.some(msg => msg.id === newMessage.id)) {
-          console.log('Message already exists, skipping');
-          return prev;
-        }
-        const updated = [...prev, newMessage];
-        console.log('Updated messages count:', updated.length);
-        return updated;
-      });
-      
-      // Force scroll to bottom after state update
-      setTimeout(scrollToBottom, 50);
-    } else if (payload.eventType === 'UPDATE') {
-      setMessages(prev => prev.map(msg => 
-        msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
-      ));
-    } else if (payload.eventType === 'DELETE') {
-      setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
-    }
-  };
-
-  useEffect(() => {
-    fetchChannels();
   }, []);
 
-  useEffect(() => {
-    if (selectedChannel || channelId) {
-      fetchMessages();
+  const fetchMessages = useCallback(async () => {
+    if (!selectedChannel) return;
 
-      const targetChannelId = channelId || selectedChannel;
-      console.log('Setting up realtime subscription for channel:', targetChannelId);
-      
-      const messageChannel = supabase
-        .channel(`messages_${targetChannelId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'messages', filter: `channel_id=eq.${targetChannelId}` },
-          handleRealtimeMessage
-        )
-        .subscribe((status) => {
-          console.log('Subscription status:', status);
-        });
-
-      return () => {
-        console.log('Cleaning up realtime subscription');
-        supabase.removeChannel(messageChannel);
-      }
-    }
-  }, [channelId, selectedChannel]);
-
-  const sendMessage = async (content: string, replyTo?: string, attachments?: File[]) => {
-    if (!user || (!channelId && !selectedChannel) || !content.trim()) return;
-
-    const targetChannelId = channelId || selectedChannel;
-    setSending(true);
-    
-    try {
-      console.log('Sending message to channel:', targetChannelId);
-      
-      // Create optimistic message first
-      const optimisticMessage: Message = {
-        id: `temp-${Date.now()}`,
-        content: content.trim(),
-        user_id: user.id,
-        channel_id: targetChannelId,
-        created_at: new Date().toISOString(),
-        reactions: {},
-        reply_to: replyTo || null,
-        user_profiles: {
-          display_name: userProfile?.display_name || user.email || 'Unknown User',
-          avatar_url: userProfile?.avatar_url
-        },
-        message_attachments: []
-      };
-
-      // Add optimistic message to UI immediately
-      setMessages(prev => [...prev, optimisticMessage]);
-      scrollToBottom();
-      
-      // Send message to server
-      const { data: messageData, error: messageError } = await supabase
-        .from('messages')
-        .insert([{
-          content: content.trim(),
-          user_id: user.id,
-          channel_id: targetChannelId,
-          reply_to: replyTo || null
-        }])
-        .select()
-        .single();
-
-      if (messageError) {
-        // Remove optimistic message on error
-        setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
-        throw messageError;
-      }
-
-      // Replace optimistic message with real message
-      setMessages(prev => prev.map(msg => 
-        msg.id === optimisticMessage.id ? {
-          ...messageData,
-          reactions: (messageData.reactions as Record<string, string[]>) || {},
-          user_profiles: optimisticMessage.user_profiles,
-          message_attachments: []
-        } as Message : msg
-      ));
-
-      console.log('Message sent successfully:', messageData);
-      
-      // Log XP for sending message
-      try {
-        const xpEarned = await logChatMessage(user.id, messageData.id);
-        console.log('XP logged successfully:', xpEarned);
-      } catch (xpError) {
-        console.error('Error logging XP:', xpError);
-      }
-
-      // Handle file attachments if any
-      if (attachments && attachments.length > 0) {
-        const uploadPromises = attachments.map(async (file) => {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-          const filePath = `${user.id}/${fileName}`;
-
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('message-attachments')
-            .upload(filePath, file);
-
-          if (uploadError) throw uploadError;
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('message-attachments')
-            .getPublicUrl(filePath);
-
-          return supabase
-            .from('message_attachments')
-            .insert([{
-              message_id: messageData.id,
-              file_name: file.name,
-              file_url: publicUrl,
-              file_type: file.type,
-              file_size: file.size
-            }]);
-        });
-
-        await Promise.all(uploadPromises);
-      }
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const updateMessage = async (messageId: string, content: string) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('messages')
-        .update({ content })
-        .eq('id', messageId)
+        .select('*, user_profiles:user_id(display_name, avatar_url, role), reply_message:reply_to(*, user_profiles(display_name))')
+        .eq('channel_id', selectedChannel)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        setError(error.message);
+      } else {
+        setMessages(data || []);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedChannel]);
+
+  const sendMessage = async (
+    content: string, 
+    replyToId?: string, 
+    attachments?: any[]
+  ) => {
+    if (!user?.id || !selectedChannel) return;
+
+    try {
+      const { data: messageData, error } = await supabase
+        .from('messages')
+        .insert({
+          content,
+          channel_id: selectedChannel,
+          user_id: user.id,
+          reply_to: replyToId || null,
+        })
+        .select('*')
         .single();
 
       if (error) throw error;
-      // Realtime will handle the update
-    } catch (error) {
-      console.error('Error updating message:', error);
-    }
-  };
 
-  const deleteMessage = async (messageId: string) => {
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId);
+      // Log XP for sending a message - this will update the database
+      await logChatMessage(user.id, messageData.id);
 
-      if (error) throw error;
-      // Realtime will handle the deletion
-    } catch (error) {
-      console.error('Error deleting message:', error);
-    }
-  };
+      // Handle attachments if any
+      if (attachments && attachments.length > 0) {
+        await Promise.all(
+          attachments.map(async (attachment) => {
+            const { error: attachmentError } = await supabase
+              .from('message_attachments')
+              .insert({
+                message_id: messageData.id,
+                file_name: attachment.name,
+                file_url: attachment.url,
+                file_type: attachment.type,
+                file_size: attachment.size || 0,
+              });
 
-  const addReaction = async (messageId: string, reaction: string) => {
-    if (!user) return;
-
-    try {
-      // Optimistically update the local state
-      setMessages(prevMessages => {
-        return prevMessages.map(msg => {
-          if (msg.id === messageId) {
-            const newReactions = { ...msg.reactions };
-            if (newReactions && newReactions[reaction]) {
-              if (newReactions[reaction]!.includes(user.id)) {
-                newReactions[reaction] = newReactions[reaction]!.filter(userId => userId !== user.id);
-              } else {
-                newReactions[reaction] = [...newReactions[reaction]!, user.id];
-              }
-            } else {
-              newReactions[reaction] = [user.id];
+            if (attachmentError) {
+              console.error('Error saving attachment:', attachmentError);
             }
-            return { ...msg, reactions: newReactions };
-          }
-          return msg;
-        });
-      });
-
-      // Update the database
-      const targetMessage = messages.find(m => m.id === messageId);
-      if (targetMessage) {
-        const currentReactions = targetMessage.reactions || {};
-        const newReactions = { ...currentReactions };
-        
-        if (newReactions[reaction] && newReactions[reaction].includes(user.id)) {
-          newReactions[reaction] = newReactions[reaction].filter(userId => userId !== user.id);
-        } else {
-          newReactions[reaction] = [...(newReactions[reaction] || []), user.id];
-        }
-
-        const { error } = await supabase
-          .from('messages')
-          .update({ reactions: newReactions })
-          .eq('id', messageId);
-
-        if (error) throw error;
+          })
+        );
       }
-      
-      // Don't refetch messages - realtime will handle updates
+
+      // Refresh messages to show the new one
+      await fetchMessages();
     } catch (error) {
-      console.error('Error adding reaction:', error);
+      console.error('Error sending message:', error);
     }
   };
 
-  const createChannel = async (name: string, description: string) => {
-    if (!user) return;
+  const createChannel = async (name: string, description: string, icon: string) => {
+    if (!user?.id) return;
 
     try {
       const { data, error } = await supabase
         .from('channels')
-        .insert([{
+        .insert({
           name,
           description,
-          created_by: user.id
-        }])
-        .select()
+          icon,
+          created_by: user.id,
+        })
+        .select('*')
         .single();
 
       if (error) throw error;
+
       await fetchChannels();
       setSelectedChannel(data.id);
     } catch (error) {
@@ -423,37 +138,208 @@ export const useChat = (channelId?: string) => {
     }
   };
 
-  const editChannel = async (channelId: string, name: string, description: string, icon: string) => {
+  const editChannel = async (id: string, name: string, description: string, icon: string) => {
+    if (!user?.id) return;
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('channels')
-        .update({ name, description, icon })
-        .eq('id', channelId);
+        .update({
+          name,
+          description,
+          icon,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
 
       if (error) throw error;
+
       await fetchChannels();
+      setSelectedChannel(data.id);
     } catch (error) {
-      console.error('Error editing channel:', error);
+      console.error('Error updating channel:', error);
     }
   };
 
-  const updateChannelReaction = addReaction; // Alias for compatibility
+  const updateChannelReaction = async (messageId: string, emoji: string) => {
+    if (!user?.id) return;
+
+    try {
+      // Fetch the existing reactions for the message
+      const { data: existingReactions, error: fetchError } = await supabase
+        .from('messages')
+        .select('reactions')
+        .eq('id', messageId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching existing reactions:', fetchError);
+        return;
+      }
+
+      // Parse existing reactions or initialize an empty object
+      const reactions = existingReactions?.reactions || {};
+
+      // Check if the user has already reacted with this emoji
+      if (reactions[emoji] && (reactions[emoji] as string[]).includes(user.id)) {
+        // Remove the user's ID from the emoji's array
+        reactions[emoji] = (reactions[emoji] as string[]).filter(userId => userId !== user.id);
+
+        // If the emoji array is empty after removing the user, remove the emoji
+        if (reactions[emoji].length === 0) {
+          delete reactions[emoji];
+        }
+      } else {
+        // Add the user's ID to the emoji's array
+        reactions[emoji] = [...(reactions[emoji] || []), user.id];
+      }
+
+      // Update the reactions in the database
+      const { error: updateError } = await supabase
+        .from('messages')
+        .update({ reactions })
+        .eq('id', messageId);
+
+      if (updateError) {
+        console.error('Error updating reactions:', updateError);
+      } else {
+        // Optimistically update the local state
+        setMessages(prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === messageId ? { ...msg, reactions } : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error updating channel reaction:', error);
+    }
+  };
+
+  const calculateUnreadCounts = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      // Fetch the last read timestamps for each channel
+      const { data: lastReadData, error: lastReadError } = await supabase
+        .from('user_channel_reads')
+        .select('channel_id, last_read_at')
+        .eq('user_id', user.id);
+
+      if (lastReadError) {
+        console.error('Error fetching last read timestamps:', lastReadError);
+        return;
+      }
+
+      const lastReadByChannel: { [channelId: string]: string } = {};
+      lastReadData.forEach(item => {
+        lastReadByChannel[item.channel_id] = item.last_read_at;
+      });
+
+      // Calculate unread counts for each channel
+      const unreadCountsByChannel: UnreadCounts = {};
+      for (const channel of channels) {
+        const lastReadAt = lastReadByChannel[channel.id];
+
+        const { count, error: countError } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact' })
+          .eq('channel_id', channel.id)
+          .gt('created_at', lastReadAt || new Date(0).toISOString()); // Messages after last read
+
+        if (countError) {
+          console.error('Error fetching unread message count:', countError);
+          continue;
+        }
+
+        unreadCountsByChannel[channel.id] = count || 0;
+      }
+
+      setUnreadCounts(unreadCountsByChannel);
+    } catch (error) {
+      console.error('Error calculating unread counts:', error);
+    }
+  }, [user, channels]);
+
+  // Call this function when a user reads a channel
+  const markChannelAsRead = async (channelId: string) => {
+    if (!user?.id) return;
+
+    try {
+      // Update or insert the last read timestamp for the user and channel
+      const { error } = await supabase
+        .from('user_channel_reads')
+        .upsert(
+          {
+            user_id: user.id,
+            channel_id: channelId,
+            last_read_at: new Date().toISOString(),
+          },
+          { onConflict: ['user_id', 'channel_id'] }
+        );
+
+      if (error) {
+        console.error('Error marking channel as read:', error);
+      } else {
+        // Optimistically update the local state
+        setUnreadCounts(prevUnreadCounts => ({
+          ...prevUnreadCounts,
+          [channelId]: 0,
+        }));
+      }
+    } catch (error) {
+      console.error('Error marking channel as read:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchChannels();
+  }, [fetchChannels]);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  useEffect(() => {
+    calculateUnreadCounts();
+  }, [calculateUnreadCounts]);
+
+  useEffect(() => {
+    if (selectedChannel) {
+      markChannelAsRead(selectedChannel);
+    }
+  }, [selectedChannel, markChannelAsRead]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('public:messages')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        (payload) => {
+          console.log('Message received!', payload);
+          fetchMessages();
+          calculateUnreadCounts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchMessages, calculateUnreadCounts]);
 
   return {
-    messages,
     channels,
+    messages,
     selectedChannel,
     setSelectedChannel,
     loading,
-    sending,
+    error,
     sendMessage,
-    updateMessage,
-    deleteMessage,
-    addReaction,
     createChannel,
-    editChannel,
     updateChannelReaction,
+    editChannel,
     unreadCounts,
-    messagesEndRef
   };
 };

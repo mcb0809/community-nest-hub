@@ -58,8 +58,9 @@ export const useCourses = () => {
     if (!user?.id) return;
 
     try {
-      // Log XP for completing course
-      await logCourseComplete(user.id, courseId);
+      // Log XP for completing course - this will now update the database
+      const xpEarned = await logCourseComplete(user.id, courseId);
+      console.log(`Course completed! XP earned: ${xpEarned}`);
       
       // Here you could also update a user_course_progress table
       // to track which courses the user has completed

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { useDailyLogin } from "@/hooks/useDailyLogin";
 import { LandingPageProvider } from "@/contexts/LandingPageContext";
 import AdminProtectedRoute from "@/components/auth/AdminProtectedRoute";
 import Web3DashboardLayout from "./components/layout/Web3DashboardLayout";
@@ -31,11 +32,18 @@ import LandingPage from "./pages/LandingPage";
 
 const queryClient = new QueryClient();
 
+// Component to handle daily login tracking
+const DailyLoginTracker = () => {
+  useDailyLogin();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
         <LandingPageProvider>
+          <DailyLoginTracker />
           <Toaster />
           <Sonner />
           <BrowserRouter>
