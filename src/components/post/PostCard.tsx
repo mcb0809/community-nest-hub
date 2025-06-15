@@ -17,7 +17,8 @@ import {
   Crown,
   Youtube,
   Play,
-  Sparkles
+  Sparkles,
+  Image as ImageIcon
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Post } from '@/hooks/usePosts';
@@ -82,8 +83,81 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
     return content.replace(/\[YOUTUBE:[a-zA-Z0-9_-]{11}\]/g, '').trim();
   };
 
+  // Get image attachments
+  const getImageAttachments = () => {
+    return post.attachments?.filter(att => att.type === 'file' && att.meta?.type?.startsWith('image/')) || [];
+  };
+
   const youtubeVideos = post.content ? extractYouTubeVideos(post.content) : [];
   const displayContent = post.content ? cleanContent(post.content) : '';
+  const imageAttachments = getImageAttachments();
+
+  // Create preview section with images/videos
+  const renderPreviewMedia = () => {
+    const hasYoutube = youtubeVideos.length > 0;
+    const hasImages = imageAttachments.length > 0;
+    
+    if (!hasYoutube && !hasImages) return null;
+
+    return (
+      <div className="mb-4">
+        {/* YouTube Thumbnails */}
+        {hasYoutube && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+            {youtubeVideos.slice(0, 3).map((videoId, index) => (
+              <div key={index} className="relative group cursor-pointer">
+                <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden border border-slate-600 hover:border-purple-500/50 transition-all duration-300">
+                  <img
+                    src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+                    alt={`YouTube thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
+                      <Play className="w-5 h-5 text-white ml-1" />
+                    </div>
+                  </div>
+                </div>
+                {youtubeVideos.length > 3 && index === 2 && (
+                  <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-semibold">+{youtubeVideos.length - 3}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Image Attachments */}
+        {hasImages && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {imageAttachments.slice(0, 3).map((attachment, index) => (
+              <div key={attachment.id} className="relative group cursor-pointer">
+                <div className="aspect-square bg-slate-900 rounded-lg overflow-hidden border border-slate-600 hover:border-purple-500/50 transition-all duration-300">
+                  <img
+                    src={attachment.url}
+                    alt={attachment.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ImageIcon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                {imageAttachments.length > 3 && index === 2 && (
+                  <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-semibold">+{imageAttachments.length - 3}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Card className={`glass-card border border-slate-700/50 hover:border-purple-500/30 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 ${
@@ -153,43 +227,21 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Preview Media Section */}
+        {renderPreviewMedia()}
+
         {displayContent && (
           <div className="prose prose-slate prose-invert max-w-none">
-            <p className="text-slate-300 whitespace-pre-wrap leading-relaxed text-base">
+            <p className="text-slate-300 whitespace-pre-wrap leading-relaxed text-base line-clamp-3">
               {displayContent}
             </p>
-          </div>
-        )}
-
-        {/* YouTube Videos */}
-        {youtubeVideos.length > 0 && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium flex items-center gap-2 text-slate-300">
-              <Youtube className="w-4 h-4 text-red-500" />
-              Video ({youtubeVideos.length})
-            </h4>
-            <div className="grid gap-4">
-              {youtubeVideos.map((videoId, index) => (
-                <div key={index} className="relative group">
-                  <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden border border-slate-600 hover:border-purple-500/50 transition-colors">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${videoId}`}
-                      className="w-full h-full"
-                      frameBorder="0"
-                      allowFullScreen
-                      title={`YouTube video ${index + 1}`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
         {/* Tags */}
         {post.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {post.tags.map((tag, index) => (
+            {post.tags.slice(0, 5).map((tag, index) => (
               <Badge 
                 key={index} 
                 variant="outline" 
@@ -198,47 +250,35 @@ const PostCard = ({ post, onEdit, onDelete, onTogglePin }: PostCardProps) => {
                 #{tag}
               </Badge>
             ))}
+            {post.tags.length > 5 && (
+              <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">
+                +{post.tags.length - 5}
+              </Badge>
+            )}
           </div>
         )}
 
-        {/* Attachments */}
-        {post.attachments && post.attachments.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-slate-300">📎 Đính kèm ({post.attachments.length})</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {post.attachments.map((attachment) => (
-                <div
-                  key={attachment.id}
-                  className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-600 hover:border-purple-500/50 transition-colors"
-                >
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 rounded flex items-center justify-center flex-shrink-0">
-                      {attachment.type === 'file' ? (
-                        <Download className="w-4 h-4 text-purple-400" />
-                      ) : (
-                        <ExternalLink className="w-4 h-4 text-cyan-400" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate text-white">{attachment.name}</p>
-                      {attachment.meta?.size && (
-                        <p className="text-xs text-slate-400">
-                          {Math.round(attachment.meta.size / 1024)} KB
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDownloadAttachment(attachment.url, attachment.name)}
-                    className="hover:bg-purple-500/20 text-purple-400 hover:text-purple-300"
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+        {/* Media Count Indicators */}
+        {(youtubeVideos.length > 0 || imageAttachments.length > 0 || (post.attachments && post.attachments.length > imageAttachments.length)) && (
+          <div className="flex items-center gap-4 text-sm text-slate-400">
+            {youtubeVideos.length > 0 && (
+              <div className="flex items-center gap-1">
+                <Youtube className="w-4 h-4 text-red-500" />
+                <span>{youtubeVideos.length} video</span>
+              </div>
+            )}
+            {imageAttachments.length > 0 && (
+              <div className="flex items-center gap-1">
+                <ImageIcon className="w-4 h-4 text-blue-500" />
+                <span>{imageAttachments.length} ảnh</span>
+              </div>
+            )}
+            {post.attachments && post.attachments.length > imageAttachments.length && (
+              <div className="flex items-center gap-1">
+                <Download className="w-4 h-4 text-green-500" />
+                <span>{post.attachments.length - imageAttachments.length} file</span>
+              </div>
+            )}
           </div>
         )}
 
