@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -86,12 +87,12 @@ const sendRegistrationWebhook = async (
     console.log('Webhook URL:', webhookUrl);
     console.log('Credentials generated successfully');
     
-    // Simplified payload without event_id and user_id
+    // Clean and encode data to prevent server issues
     const payload = {
-      user_name: userName || '',
-      user_email: userEmail || '',
-      event_title: event.title || '',
-      event_time: `${event.date} ${event.time}`,
+      user_name: (userName || '').trim(),
+      user_email: (userEmail || '').trim(),
+      event_title: (event.title || '').trim(),
+      event_time: `${event.date} ${event.time}`.trim(),
       registered_at: new Date().toISOString()
     };
     
@@ -99,16 +100,25 @@ const sendRegistrationWebhook = async (
     
     const response = await fetch(webhookUrl, {
       method: 'POST',
-      mode: 'no-cors',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${credentials}`
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Basic ${credentials}`,
+        'Accept': 'application/json'
       },
       body: JSON.stringify(payload)
     });
 
-    console.log('✅ Registration webhook sent successfully (no-cors mode)');
-    console.log('Note: Response status cannot be checked due to no-cors mode');
+    console.log('Response status:', response.status);
+    
+    if (response.ok) {
+      console.log('✅ Registration webhook sent successfully');
+      const responseData = await response.text();
+      console.log('Response data:', responseData);
+    } else {
+      console.error('❌ Webhook failed with status:', response.status);
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+    }
     
   } catch (error) {
     console.error('❌ Error sending registration webhook:', error);
