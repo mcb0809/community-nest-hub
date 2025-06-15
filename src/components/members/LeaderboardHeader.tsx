@@ -11,30 +11,42 @@ import {
   Calendar
 } from 'lucide-react';
 
-const LeaderboardHeader = () => {
+interface LeaderboardHeaderProps {
+  totalMembers: number;
+  onlineMembers: number;
+  newMembersThisWeek: number;
+  activePercentage: number;
+}
+
+const LeaderboardHeader = ({ 
+  totalMembers, 
+  onlineMembers, 
+  newMembersThisWeek, 
+  activePercentage 
+}: LeaderboardHeaderProps) => {
   const stats = [
     {
       icon: Users,
       label: 'Tổng thành viên',
-      value: '2,847',
+      value: totalMembers.toLocaleString(),
       color: 'text-blue-400'
     },
     {
       icon: Crown,
-      label: 'Thành viên VIP',
-      value: '156',
+      label: 'Đang online',
+      value: onlineMembers.toString(),
       color: 'text-yellow-400'
     },
     {
       icon: TrendingUp,
       label: 'Hoạt động tuần này',
-      value: '89%',
+      value: `${activePercentage}%`,
       color: 'text-green-400'
     },
     {
       icon: Calendar,
       label: 'Tham gia mới',
-      value: '+47',
+      value: `+${newMembersThisWeek}`,
       color: 'text-purple-400'
     }
   ];

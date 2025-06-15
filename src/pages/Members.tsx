@@ -103,6 +103,18 @@ const Members = () => {
     return matchesSearch && matchesFilter && matchesLevel;
   });
 
+  // Calculate stats for header
+  const totalMembers = members.length;
+  const onlineMembers = members.filter(m => m.isOnline).length;
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const newMembersThisWeek = members.filter(m => 
+    new Date(m.joinDate) > weekAgo
+  ).length;
+  const activePercentage = totalMembers > 0 
+    ? Math.round((onlineMembers / totalMembers) * 100) 
+    : 0;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -116,8 +128,13 @@ const Members = () => {
 
   return (
     <div className="space-y-8">
-      {/* Gamification Header */}
-      <LeaderboardHeader />
+      {/* Gamification Header with real stats */}
+      <LeaderboardHeader 
+        totalMembers={totalMembers}
+        onlineMembers={onlineMembers}
+        newMembersThisWeek={newMembersThisWeek}
+        activePercentage={activePercentage}
+      />
 
       {/* Section Highlight Tuần này */}
       <div className="flex flex-col md:flex-row items-center justify-center gap-4">
