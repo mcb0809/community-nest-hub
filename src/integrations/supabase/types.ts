@@ -466,6 +466,39 @@ export type Database = {
           },
         ]
       }
+      level_config: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          level_name: string
+          level_number: number
+          required_xp: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          level_name: string
+          level_number: number
+          required_xp: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          level_name?: string
+          level_number?: number
+          required_xp?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       message_attachments: {
         Row: {
           created_at: string
@@ -1009,6 +1042,16 @@ export type Database = {
       calculate_level: {
         Args: { total_xp: number }
         Returns: number
+      }
+      calculate_level_from_config: {
+        Args: { total_xp: number }
+        Returns: {
+          level_number: number
+          level_name: string
+          color: string
+          icon: string
+          progress: number
+        }[]
       }
       calculate_level_progress: {
         Args: { total_xp: number; current_level: number }

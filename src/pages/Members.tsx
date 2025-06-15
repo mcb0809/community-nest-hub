@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
@@ -17,25 +18,9 @@ import {
 import { ChevronDown } from "lucide-react";
 import { Card, CardContent } from '@/components/ui/card';
 import { useLeaderboardRealtime, recalculateUserStats } from '@/hooks/useLeaderboardRealtime';
+import { useLevelConfig } from '@/hooks/useLevelConfig';
 import { useToast } from '@/hooks/use-toast';
 import { useOnlineTracking } from '@/hooks/useOnlineTracking';
-
-const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
-
-function getLevel(xp: number) {
-  let level = 1, acc = 0;
-  for (let i = 0; i < levelThresholds.length; i++) {
-    acc += levelThresholds[i];
-    if (xp < acc) {
-      return {
-        level: i + 1,
-        progress: Math.round((xp - (acc - levelThresholds[i])) * 100 / levelThresholds[i]),
-        maxXp: acc,
-      };
-    }
-  }
-  return { level: 10, progress: 100, maxXp: acc };
-}
 
 const filterOptions = [
   { value: 'all', label: 'Tất cả', icon: Trophy },
@@ -58,6 +43,7 @@ const Members = () => {
 
   // Get realtime data from Supabase using the updated hook (handles both data and presence)
   const { users: members, loading } = useLeaderboardRealtime();
+  const { levelConfigs, getLevelByNumber } = useLevelConfig();
 
   // Handle manual refresh/recalculation
   const handleRefreshStats = async () => {
@@ -78,9 +64,60 @@ const Members = () => {
     setIsRefreshing(false);
   };
 
+  // Calculate level info using level configs
+  const getLevel = (xp: number) => {
+    if (!levelConfigs.length) {
+      // Fallback to old calculation if no configs
+      let level = 1, acc = 0;
+      const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
+      for (let i = 0; i < levelThresholds.length; i++) {
+        acc += levelThresholds[i];
+        if (xp < acc) {
+          return {
+            level: i + 1,
+            progress: Math.round((xp - (acc - levelThresholds[i])) * 100 / levelThresholds[i]),
+            maxXp: acc,
+          };
+        }
+      }
+      return { level: 10, progress: 100, maxXp: acc };
+    }
+
+    // Find current level based on XP
+    let currentLevel = levelConfigs[0]; // Default to level 1
+    for (const config of levelConfigs) {
+      if (xp >= config.required_xp) {
+        currentLevel = config;
+      } else {
+        break;
+      }
+    }
+
+    // Find next level for progress calculation
+    const nextLevel = levelConfigs.find(config => config.level_number === currentLevel.level_number + 1);
+    
+    let progress = 100; // Max level reached
+    let maxXp = currentLevel.required_xp;
+    
+    if (nextLevel) {
+      const progressXp = Math.max(0, xp - currentLevel.required_xp);
+      const requiredXp = nextLevel.required_xp - currentLevel.required_xp;
+      progress = Math.min(100, Math.max(0, Math.round((progressXp / requiredXp) * 100)));
+      maxXp = nextLevel.required_xp;
+    }
+
+    return {
+      level: currentLevel.level_number,
+      progress,
+      maxXp,
+    };
+  };
+
   // Transform and add required fields for MemberCard with better error handling
   const membersWithStats = members.map((member, i) => {
     const levelData = getLevel(member.xp || 0);
+    const levelConfig = getLevelByNumber(levelData.level);
+    
     return {
       ...member,
       avatar: member.avatar ?? '',
@@ -96,6 +133,9 @@ const Members = () => {
       joinDate: member.joinDate ?? new Date().toISOString(),
       isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
       messagesCount: member.postsCount ?? 0, // Use postsCount from the hook
+      levelName: member.levelName || levelConfig?.level_name,
+      levelColor: member.levelColor || levelConfig?.color,
+      levelIcon: member.levelIcon || levelConfig?.icon,
     };
   });
 
@@ -246,10 +286,10 @@ const Members = () => {
                 </Button>
                 {levelFilter !== null && (
                   <div className="absolute bg-slate-900 rounded shadow-md mt-1 z-10">
-                    {Array.from({ length: 10 }, (_, i) => (
-                      <div key={i} className="px-4 py-2 hover:bg-purple-500/20 cursor-pointer text-white"
-                        onClick={() => setLevelFilter(i + 1)}>
-                        Level {i + 1}
+                    {levelConfigs.map((config) => (
+                      <div key={config.level_number} className="px-4 py-2 hover:bg-purple-500/20 cursor-pointer text-white"
+                        onClick={() => setLevelFilter(config.level_number)}>
+                        Level {config.level_number} - {config.level_name}
                       </div>
                     ))}
                     <div className="px-4 py-2 text-slate-400 cursor-pointer" onClick={() => setLevelFilter(null)}>Bỏ lọc</div>

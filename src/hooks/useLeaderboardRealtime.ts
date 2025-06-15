@@ -1,7 +1,7 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useLevelConfig } from "./useLevelConfig";
 
 export interface LeaderboardUser {
   id: string;
@@ -17,6 +17,9 @@ export interface LeaderboardUser {
   joinDate: string;
   title?: string;
   postsCount: number;
+  levelName?: string;
+  levelColor?: string;
+  levelIcon?: string;
 }
 
 export function useLeaderboardRealtime() {
@@ -24,6 +27,7 @@ export function useLeaderboardRealtime() {
   const [loading, setLoading] = useState(true);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const { user } = useAuth();
+  const { levelConfigs, getLevelByNumber } = useLevelConfig();
 
   async function fetchLeaderboard() {
     console.log("Fetching leaderboard data...");
@@ -81,30 +85,31 @@ export function useLeaderboardRealtime() {
 
       console.log("Posts counts:", postsCounts);
 
-      // Combine all data
+      // Combine all data with level information
       const mapped: LeaderboardUser[] = (profilesData || []).map((profile: any) => {
         const userStats = statsData?.find(s => s.user_id === profile.id);
         const totalXp = userStats?.total_xp || 0;
         const level = userStats?.level || 1;
         
-        // Simple level progress calculation
-        const calculateSimpleLevelProgress = (xp: number, currentLevel: number) => {
-          const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000, 25000];
+        // Get level config for this level
+        const levelConfig = getLevelByNumber(level);
+        
+        // Calculate level progress using level configs
+        const calculateLevelProgress = (xp: number, currentLevel: number) => {
+          if (!levelConfigs.length) return 0;
           
-          if (currentLevel <= 0 || currentLevel > levelThresholds.length) {
-            return 0;
-          }
+          const currentLevelConfig = getLevelByNumber(currentLevel);
+          const nextLevelConfig = getLevelByNumber(currentLevel + 1);
           
-          let accumulatedXp = 0;
-          for (let i = 0; i < currentLevel - 1; i++) {
-            accumulatedXp += levelThresholds[i] || 0;
-          }
+          if (!currentLevelConfig) return 0;
+          if (!nextLevelConfig) return 100; // Max level reached
           
-          const currentLevelThreshold = levelThresholds[currentLevel - 1] || 1000;
-          const progressXp = Math.max(0, xp - accumulatedXp);
-          const progress = Math.min(100, Math.max(0, Math.round((progressXp / currentLevelThreshold) * 100)));
+          const currentLevelXp = currentLevelConfig.required_xp;
+          const nextLevelXp = nextLevelConfig.required_xp;
+          const progressXp = Math.max(0, xp - currentLevelXp);
+          const requiredXp = nextLevelXp - currentLevelXp;
           
-          return progress;
+          return Math.min(100, Math.max(0, Math.round((progressXp / requiredXp) * 100)));
         };
 
         return {
@@ -113,7 +118,7 @@ export function useLeaderboardRealtime() {
           avatar: profile.avatar_url,
           xp: totalXp,
           level: level,
-          levelProgress: calculateSimpleLevelProgress(totalXp, level),
+          levelProgress: calculateLevelProgress(totalXp, level),
           coursesCompleted: userStats?.courses_completed || 0,
           streak: userStats?.current_streak || 0,
           badges: [], // Will be implemented with badge system later
@@ -121,6 +126,9 @@ export function useLeaderboardRealtime() {
           joinDate: profile.created_at || new Date().toISOString(),
           title: undefined, // Can be set based on achievements later
           postsCount: postsCounts[profile.id] || 0,
+          levelName: levelConfig?.level_name,
+          levelColor: levelConfig?.color,
+          levelIcon: levelConfig?.icon,
         };
       });
 
@@ -136,6 +144,13 @@ export function useLeaderboardRealtime() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // Only fetch if level configs are loaded
+    if (levelConfigs.length > 0) {
+      fetchLeaderboard();
+    }
+  }, [levelConfigs, onlineUsers.size]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -212,6 +227,14 @@ export function useLeaderboardRealtime() {
         { event: "*", schema: "public", table: "posts" },
         (payload) => {
           console.log("Posts changed:", payload);
+          fetchLeaderboard();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "level_config" },
+        (payload) => {
+          console.log("Level config changed:", payload);
           fetchLeaderboard();
         }
       )
