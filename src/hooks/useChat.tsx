@@ -92,8 +92,7 @@ export const useChat = (channelId?: string) => {
           reactions: msg.reactions || {},
           user_profiles: userProfile ? {
             display_name: userProfile.display_name,
-            avatar_url: userProfile.avatar_url,
-            email: userProfile.email
+            avatar_url: userProfile.avatar_url
           } : undefined,
           message_attachments: attachments
         };
@@ -159,8 +158,7 @@ export const useChat = (channelId?: string) => {
         reactions: payload.new.reactions || {},
         user_profiles: userProfile ? {
           display_name: userProfile.display_name,
-          avatar_url: userProfile.avatar_url,
-          email: userProfile.email
+          avatar_url: userProfile.avatar_url
         } : undefined,
         message_attachments: attachments || []
       };
@@ -239,9 +237,7 @@ export const useChat = (channelId?: string) => {
         reply_to: replyTo || null,
         user_profiles: {
           display_name: userProfile?.display_name || user.email || 'Unknown User',
-          avatar_url: userProfile?.avatar_url,
-          email: userProfile?.email || user.email,
-          role: userProfile?.role || 'user'
+          avatar_url: userProfile?.avatar_url
         },
         message_attachments: []
       };
