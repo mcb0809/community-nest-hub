@@ -45,35 +45,51 @@ export const useChat = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First fetch messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select(`
-          *, 
-          user_profiles!messages_user_id_fkey(display_name, avatar_url, role), 
-          reply_message:reply_to(*, user_profiles!messages_user_id_fkey(display_name))
-        `)
+        .select('*')
         .eq('channel_id', selectedChannel)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        setError(error.message);
-      } else {
-        // Transform the data to match our Message type
-        const transformedMessages: Message[] = (data || []).map((msg: any) => ({
-          id: msg.id,
-          content: msg.content,
-          channel_id: msg.channel_id,
-          user_id: msg.user_id,
-          created_at: msg.created_at,
-          updated_at: msg.updated_at,
-          reactions: msg.reactions || {},
-          reply_to: msg.reply_to,
-          user_profiles: msg.user_profiles,
-          reply_message: msg.reply_message,
-          attachments: msg.attachments || []
-        }));
-        setMessages(transformedMessages);
+      if (messagesError) {
+        setError(messagesError.message);
+        return;
       }
+
+      // Then fetch user profiles for all unique user IDs
+      const userIds = [...new Set((messagesData || []).map(msg => msg.user_id))];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('id, display_name, avatar_url, role')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching user profiles:', profilesError);
+      }
+
+      // Create a map of user profiles
+      const profilesMap = (profilesData || []).reduce((acc, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Transform the data to match our Message type
+      const transformedMessages: Message[] = (messagesData || []).map((msg: any) => ({
+        id: msg.id,
+        content: msg.content,
+        channel_id: msg.channel_id,
+        user_id: msg.user_id,
+        created_at: msg.created_at,
+        updated_at: msg.updated_at,
+        reactions: msg.reactions || {},
+        reply_to: msg.reply_to,
+        user_profiles: profilesMap[msg.user_id] || null,
+        reply_message: null, // We'll handle replies separately if needed
+        attachments: []
+      }));
+
+      setMessages(transformedMessages);
     } catch (err: any) {
       setError(err.message);
     } finally {
