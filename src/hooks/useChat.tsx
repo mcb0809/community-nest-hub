@@ -52,25 +52,56 @@ export const useChat = (channelId?: string) => {
     const targetChannelId = channelId || selectedChannel;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch messages and user profiles separately to avoid relationship issues
+      const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select(`
-          *,
-          user_profiles (display_name, avatar_url),
-          message_attachments (*)
-        `)
+        .select('*')
         .eq('channel_id', targetChannelId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      
-      // Transform the data to match our Message interface
-      const transformedMessages: Message[] = (data || []).map((msg: any) => ({
-        ...msg,
-        reactions: msg.reactions || {}
-      }));
+      if (messagesError) throw messagesError;
+
+      // Fetch user profiles separately
+      const userIds = [...new Set(messagesData?.map(msg => msg.user_id) || [])];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('id, display_name, avatar_url, email')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.warn('Could not fetch user profiles:', profilesError);
+      }
+
+      // Fetch attachments separately
+      const messageIds = messagesData?.map(msg => msg.id) || [];
+      const { data: attachmentsData, error: attachmentsError } = await supabase
+        .from('message_attachments')
+        .select('*')
+        .in('message_id', messageIds);
+
+      if (attachmentsError) {
+        console.warn('Could not fetch attachments:', attachmentsError);
+      }
+
+      // Combine data
+      const transformedMessages: Message[] = (messagesData || []).map((msg: any) => {
+        const userProfile = profilesData?.find(p => p.id === msg.user_id);
+        const attachments = attachmentsData?.filter(att => att.message_id === msg.id) || [];
+        
+        return {
+          ...msg,
+          reactions: msg.reactions || {},
+          user_profiles: userProfile ? {
+            display_name: userProfile.display_name,
+            avatar_url: userProfile.avatar_url,
+            email: userProfile.email
+          } : undefined,
+          message_attachments: attachments
+        };
+      });
       
       setMessages(transformedMessages);
+      console.log('Messages fetched successfully:', transformedMessages.length);
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -152,8 +183,15 @@ export const useChat = (channelId?: string) => {
 
       if (messageError) throw messageError;
 
-      // Log XP for sending message
-      await logChatMessage(user.id, messageData.id);
+      console.log('Message sent, logging XP for user:', user.id);
+      
+      // Log XP for sending message - ensure this actually works
+      try {
+        const xpEarned = await logChatMessage(user.id, messageData.id);
+        console.log('XP logged successfully:', xpEarned);
+      } catch (xpError) {
+        console.error('Error logging XP:', xpError);
+      }
 
       // Handle file attachments if any
       if (attachments && attachments.length > 0) {
@@ -247,7 +285,7 @@ export const useChat = (channelId?: string) => {
         });
       });
 
-      // Update the database - using custom SQL function instead of RPC
+      // Update the database
       const targetMessage = messages.find(m => m.id === messageId);
       if (targetMessage) {
         const currentReactions = targetMessage.reactions || {};

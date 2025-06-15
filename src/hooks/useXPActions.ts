@@ -78,10 +78,24 @@ export const useXPActions = () => {
   }, []);
 
   const logChatMessage = useCallback(async (userId: string, messageId?: string) => {
-    const xp = await logXPAction(userId, 'send_message', 'Sent a chat message', messageId);
-    // Không hiển thị toast cho tin nhắn chat để tránh spam
-    return xp;
-  }, []);
+    try {
+      console.log('Attempting to log chat message XP for user:', userId);
+      const xp = await logXPAction(userId, 'send_message', 'Sent a chat message', messageId);
+      console.log('Chat message XP logged:', xp);
+      
+      // Only show toast if XP was actually earned (avoid spam for 0 XP)
+      if (xp > 0) {
+        toast({
+          title: "Message sent!",
+          description: `+${xp} XP earned`,
+        });
+      }
+      return xp;
+    } catch (error) {
+      console.error('Error logging chat message XP:', error);
+      return 0;
+    }
+  }, [toast]);
 
   return {
     logLike,
