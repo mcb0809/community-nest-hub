@@ -14,6 +14,7 @@ export interface LeaderboardUser {
   badges: string[];
   isOnline: boolean;
   joinDate: string;
+  title?: string; // Added optional title property
 }
 
 const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000];
@@ -46,7 +47,7 @@ export function useLeaderboardRealtime() {
         display_name,
         avatar_url,
         created_at,
-        user_stats: user_stats (
+        user_stats!inner (
           total_xp,
           courses_completed,
           current_streak,
@@ -55,30 +56,33 @@ export function useLeaderboardRealtime() {
         )
       `)
       .order("user_stats.total_xp", { ascending: false });
+    
     if (error) {
+      console.error("Error fetching leaderboard:", error);
       setLoading(false);
       return;
     }
+    
     const mapped: LeaderboardUser[] = (data || []).map((u: any) => {
       const xp = u.user_stats?.total_xp || 0;
       const levelData = getLevel(xp);
       return {
         id: u.id,
-        name: u.display_name,
+        name: u.display_name || 'Anonymous',
         avatar: u.avatar_url,
         xp,
         level: levelData.level,
         levelProgress: levelData.progress,
         coursesCompleted: u.user_stats?.courses_completed || 0,
         streak: u.user_stats?.current_streak || 0,
-        // Cần badge, isOnline, joinDate lấy từ các nguồn thích hợp:
-        badges: [],
+        badges: [], // Will be implemented later
         isOnline: !!(
           u.user_stats &&
           u.user_stats.last_activity &&
           new Date().getTime() - new Date(u.user_stats.last_activity).getTime() < 30 * 60 * 1000
         ),
         joinDate: u.created_at,
+        title: undefined, // Can be set based on achievements later
       };
     });
     setUsers(mapped);
@@ -87,7 +91,7 @@ export function useLeaderboardRealtime() {
 
   useEffect(() => {
     fetchLeaderboard();
-    // Lắng nghe realtime changes từ user_stats
+    // Listen for realtime changes from user_stats
     const channel = supabase
       .channel("realtime-user_stats")
       .on(

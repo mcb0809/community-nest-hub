@@ -40,37 +40,28 @@ const filterOptions = [
   { value: 'streak', label: 'Streak cao', icon: Zap },
 ];
 
-// Bộ lọc thêm
-const extraFilters = [
-  { value: 'level', label: 'Level', options: Array.from({ length: 10 }, (_, i) => i + 1) },
-  { value: 'streak', label: 'Streak 7+', options: [] },
-  { value: 'xp', label: 'XP 10k+', options: [] },
-];
-
 const Members = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [showXPModal, setShowXPModal] = useState(false);
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
 
-  // Lấy dữ liệu realtime từ Supabase
+  // Get realtime data from Supabase
   const { users: members, loading } = useLeaderboardRealtime();
 
-  // Chuẩn hóa và bổ sung các trường cần thiết cho MemberCard
+  // Transform and add required fields for MemberCard
   const membersWithStats = members.map((member, i) => {
-    // Convert some fallback fields for compatibility
     const levelData = getLevel(member.xp || 0);
     return {
       ...member,
-      avatar: member.avatar ?? '', // fallback nếu Supabase trả về null
+      avatar: member.avatar ?? '',
       badges: Array.isArray(member.badges) ? member.badges : [],
-      title: member.title ?? '',
+      title: member.title ?? '', // Now properly handled
       rank: i + 1,
       totalPoints: member.xp,
       maxXp: levelData.maxXp,
       level: levelData.level,
       levelProgress: levelData.progress,
-      // fallback nếu thiếu trường (giữ UI không crash)
       coursesCompleted: member.coursesCompleted ?? 0,
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? '',
@@ -78,7 +69,7 @@ const Members = () => {
     };
   });
 
-  // Bổ sung lọc theo Level
+  // Filter by Level
   const filteredMembers = membersWithStats.filter(member => {
     const matchesSearch = (member.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || 
