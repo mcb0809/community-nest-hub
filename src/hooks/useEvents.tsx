@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -71,10 +72,30 @@ const sendEventWebhook = async (event: Event) => {
 
 const sendRegistrationWebhook = async (event: Event, userName: string, userId: string) => {
   try {
-    console.log('Sending registration webhook for event:', event.id, 'user:', userName);
+    console.log('=== STARTING REGISTRATION WEBHOOK ===');
+    console.log('Event ID:', event.id);
+    console.log('User Name:', userName);
+    console.log('User ID:', userId);
+    console.log('Event Title:', event.title);
     
     const webhookUrl = 'https://mcbaivn.tino.page/webhook/eventjoint';
     const credentials = btoa('MCBAIVN:Machbang8920!');
+    
+    console.log('Webhook URL:', webhookUrl);
+    console.log('Credentials generated successfully');
+    
+    const payload = {
+      event_id: event.id,
+      event_title: event.title,
+      event_date: event.date,
+      event_time: event.time,
+      user_id: userId,
+      user_name: userName,
+      registered_at: new Date().toISOString(),
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('Payload to send:', JSON.stringify(payload, null, 2));
     
     const response = await fetch(webhookUrl, {
       method: 'POST',
@@ -82,25 +103,28 @@ const sendRegistrationWebhook = async (event: Event, userName: string, userId: s
         'Content-Type': 'application/json',
         'Authorization': `Basic ${credentials}`
       },
-      body: JSON.stringify({
-        event_id: event.id,
-        event_title: event.title,
-        event_date: event.date,
-        event_time: event.time,
-        user_id: userId,
-        user_name: userName,
-        registered_at: new Date().toISOString(),
-        timestamp: new Date().toISOString()
-      })
+      body: JSON.stringify(payload)
     });
 
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
+    
     if (response.ok) {
-      console.log('Registration webhook sent successfully');
+      console.log('✅ Registration webhook sent successfully');
+      const responseText = await response.text();
+      console.log('Response body:', responseText);
     } else {
-      console.error('Registration webhook failed with status:', response.status);
+      console.error('❌ Registration webhook failed with status:', response.status);
+      const errorText = await response.text();
+      console.error('Error response body:', errorText);
     }
   } catch (error) {
-    console.error('Error sending registration webhook:', error);
+    console.error('❌ Error sending registration webhook:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
   }
 };
 
@@ -249,12 +273,18 @@ export const useEvents = () => {
 
   const registerForEvent = async (eventId: string, userName: string) => {
     try {
+      console.log('=== STARTING EVENT REGISTRATION ===');
+      console.log('Event ID:', eventId);
+      console.log('User Name:', userName);
+      
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         throw new Error('User not authenticated');
       }
+
+      console.log('Authenticated User ID:', user.id);
 
       // First, add registration with user_id
       const { error: registrationError } = await supabase
@@ -265,19 +295,29 @@ export const useEvents = () => {
           user_id: user.id
         }]);
 
-      if (registrationError) throw registrationError;
+      if (registrationError) {
+        console.error('Registration error:', registrationError);
+        throw registrationError;
+      }
+
+      console.log('✅ Registration added to database successfully');
 
       // Then update the event's registered count and users list
       const event = events.find(e => e.id === eventId);
       if (event) {
+        console.log('Event found for webhook:', event.title);
         const newRegisteredUsers = [...(event.registered_users || []), userName];
         await updateEvent(eventId, {
           registered: event.registered + 1,
           registered_users: newRegisteredUsers
         });
 
+        console.log('✅ Event updated, now sending registration webhook...');
+        
         // Send registration webhook after successful registration
         await sendRegistrationWebhook(event, userName, user.id);
+      } else {
+        console.error('❌ Event not found in local state for webhook');
       }
 
       toast({
@@ -285,7 +325,7 @@ export const useEvents = () => {
         description: "Successfully registered for event",
       });
     } catch (error: any) {
-      console.error('Error registering for event:', error);
+      console.error('❌ Error registering for event:', error);
       toast({
         title: "Error",
         description: "Failed to register for event",
