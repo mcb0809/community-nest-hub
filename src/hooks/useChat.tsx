@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -140,6 +139,8 @@ export const useChat = () => {
     if (!user?.id || !selectedChannel) return;
 
     try {
+      console.log('Sending message and logging XP...');
+      
       const { data: messageData, error } = await supabase
         .from('messages')
         .insert({
@@ -153,8 +154,15 @@ export const useChat = () => {
 
       if (error) throw error;
 
-      // Log XP for sending a message - this will update the database
-      await logChatMessage(user.id, messageData.id);
+      console.log('Message sent successfully:', messageData);
+
+      // Log XP for sending a message - await this to ensure it completes
+      try {
+        const xpEarned = await logChatMessage(user.id, messageData.id);
+        console.log('XP logged for chat message:', xpEarned);
+      } catch (xpError) {
+        console.error('Error logging XP for chat message:', xpError);
+      }
 
       // Handle attachments if any
       if (attachments && attachments.length > 0) {
@@ -177,7 +185,7 @@ export const useChat = () => {
         );
       }
 
-      // Don't fetch all messages, just add the new one with user profile
+      // Add the new message to local state with user profile
       await addNewMessage(messageData);
     } catch (error) {
       console.error('Error sending message:', error);

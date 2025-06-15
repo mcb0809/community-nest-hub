@@ -79,20 +79,23 @@ export const useXPActions = () => {
 
   const logChatMessage = useCallback(async (userId: string, messageId?: string) => {
     try {
-      console.log('Attempting to log chat message XP for user:', userId);
+      console.log('🎯 Logging chat message XP for user:', userId, 'message:', messageId);
       const xp = await logXPAction(userId, 'send_message', 'Sent a chat message', messageId);
-      console.log('Chat message XP logged:', xp);
+      console.log('✅ Chat message XP logged successfully:', xp);
       
-      // Show toast for XP earned (even if it's small amount)
+      // Always show toast for chat messages to confirm XP was earned
       if (xp > 0) {
         toast({
-          title: "Message sent!",
+          title: "Message sent! 💬",
           description: `+${xp} XP earned`,
+          duration: 2000,
         });
+      } else {
+        console.warn('⚠️ No XP earned for chat message');
       }
       return xp;
     } catch (error) {
-      console.error('Error logging chat message XP:', error);
+      console.error('❌ Error logging chat message XP:', error);
       return 0;
     }
   }, [toast]);
