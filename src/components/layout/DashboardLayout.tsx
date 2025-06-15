@@ -1,35 +1,24 @@
 
-import React, { useState, useEffect } from 'react';
-import Sidebar from './Sidebar';
+import React from 'react';
 import Header from './Header';
+import Sidebar from './Sidebar';
+import { useOnlineTracking } from '@/hooks/useOnlineTracking';
 
-const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+}
 
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
+const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+  // Track user online time and activity
+  useOnlineTracking();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      
-      <div className="lg:ml-64 flex flex-col min-h-screen">
-        <Header 
-          toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          darkMode={darkMode}
-          toggleDarkMode={() => setDarkMode(!darkMode)}
-        />
-        
-        <main className="flex-1 p-4 lg:p-6">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
+    <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-auto p-6">
+          {children}
         </main>
       </div>
     </div>

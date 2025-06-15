@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import MemberCard from '@/components/members/MemberCard';
 import LeaderboardHeader from '@/components/members/LeaderboardHeader';
@@ -52,7 +51,7 @@ const Members = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  // Get realtime data from Supabase using the new optimized view
+  // Get realtime data from Supabase using the updated view
   const { users: members, loading } = useLeaderboardRealtime();
 
   // Handle manual refresh/recalculation
@@ -91,7 +90,7 @@ const Members = () => {
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? '',
       isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
-      // Add messages count from the data
+      // Add messages count from the updated database view
       messagesCount: (member as any).messages_count ?? 0,
     };
   });

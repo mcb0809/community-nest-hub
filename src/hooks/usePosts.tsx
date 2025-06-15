@@ -1,7 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { useXPActions } from './useXPActions';
 
 export interface PostAttachment {
   id: string;
@@ -34,6 +34,7 @@ export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { logWritePost, logLike, logComment, logShare } = useXPActions();
 
   const fetchPosts = async (filters?: { tags?: string[], visibility?: string, search?: string }) => {
     try {
@@ -120,6 +121,11 @@ export const usePosts = () => {
         .single();
 
       if (error) throw error;
+      
+      // Log XP for writing post
+      if (user?.id) {
+        await logWritePost(user.id, data.id);
+      }
       
       // Fetch user profile separately
       let userProfile = null;
@@ -299,6 +305,42 @@ export const usePosts = () => {
     }
   };
 
+  const likePost = async (postId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Here you would implement the actual like logic
+      // For now, just log the XP
+      await logLike(user.id, postId);
+    } catch (error) {
+      console.error('Error liking post:', error);
+    }
+  };
+
+  const commentOnPost = async (postId: string, commentContent: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Here you would implement the actual comment logic
+      // For now, just log the XP
+      await logComment(user.id, postId);
+    } catch (error) {
+      console.error('Error commenting on post:', error);
+    }
+  };
+
+  const sharePost = async (postId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Here you would implement the actual share logic
+      // For now, just log the XP
+      await logShare(user.id, postId);
+    } catch (error) {
+      console.error('Error sharing post:', error);
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
   }, []);
@@ -311,6 +353,9 @@ export const usePosts = () => {
     deletePost,
     togglePin,
     uploadAttachment,
+    likePost,
+    commentOnPost,
+    sharePost,
     refetch: fetchPosts
   };
 };

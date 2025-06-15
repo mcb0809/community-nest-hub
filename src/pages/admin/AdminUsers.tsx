@@ -61,7 +61,7 @@ const AdminUsers = () => {
       level: user.level || 1,
       posts_count: user.posts_count || 0,
       courses_completed: user.courses_completed || 0,
-      messages_count: user.messages_count || 0,
+      messages_count: user.messages_count || 0, // Now properly included
       last_activity: user.last_activity,
     }
   }));
