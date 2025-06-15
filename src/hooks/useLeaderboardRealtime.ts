@@ -30,9 +30,9 @@ export function useLeaderboardRealtime() {
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
   
-  // Use ref to track if we already have an active subscription
+  // Use ref to track channel and prevent multiple subscriptions
   const channelRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
+  const isInitializedRef = useRef(false);
 
   async function fetchLeaderboard() {
     console.log("Fetching leaderboard data...");
@@ -150,13 +150,34 @@ export function useLeaderboardRealtime() {
     }
   }
 
+  // Cleanup function to safely remove channel
+  const cleanupChannel = () => {
+    if (channelRef.current) {
+      console.log('Cleaning up existing channel');
+      try {
+        channelRef.current.untrack();
+        supabase.removeChannel(channelRef.current);
+      } catch (error) {
+        console.warn('Error cleaning up channel:', error);
+      }
+      channelRef.current = null;
+    }
+    isInitializedRef.current = false;
+  };
+
   useEffect(() => {
-    // Only proceed if we have the required data and no active subscription
-    if (!levelConfigs.length || !user?.id || isSubscribedRef.current) {
+    // Only proceed if we have the required data and haven't initialized yet
+    if (!levelConfigs.length || !user?.id || isInitializedRef.current) {
       return;
     }
 
     console.log("Setting up leaderboard realtime subscription for user:", user.id);
+
+    // Clean up any existing channel first
+    cleanupChannel();
+
+    // Mark as initialized to prevent re-initialization
+    isInitializedRef.current = true;
 
     // Initial fetch
     fetchLeaderboard();
@@ -175,7 +196,6 @@ export function useLeaderboardRealtime() {
 
     // Store channel reference
     channelRef.current = presenceChannel;
-    isSubscribedRef.current = true;
 
     // Listen for presence sync events
     presenceChannel
@@ -249,22 +269,26 @@ export function useLeaderboardRealtime() {
 
     // Handle page visibility changes for presence tracking
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log('Page hidden, untracking presence');
-        presenceChannel.untrack();
-      } else {
-        console.log('Page visible, tracking presence');
-        presenceChannel.track({
-          user_id: user.id,
-          online_at: new Date().toISOString(),
-        });
+      if (channelRef.current) {
+        if (document.hidden) {
+          console.log('Page hidden, untracking presence');
+          channelRef.current.untrack();
+        } else {
+          console.log('Page visible, tracking presence');
+          channelRef.current.track({
+            user_id: user.id,
+            online_at: new Date().toISOString(),
+          });
+        }
       }
     };
 
     // Handle page unload
     const handleBeforeUnload = () => {
-      console.log('Page unloading, untracking presence');
-      presenceChannel.untrack();
+      if (channelRef.current) {
+        console.log('Page unloading, untracking presence');
+        channelRef.current.untrack();
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -274,14 +298,7 @@ export function useLeaderboardRealtime() {
       console.log('Cleaning up leaderboard realtime subscription');
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      
-      // Untrack presence before removing channel
-      if (channelRef.current) {
-        channelRef.current.untrack();
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-      isSubscribedRef.current = false;
+      cleanupChannel();
     };
   }, [user?.id, levelConfigs.length]); // Only depend on user ID and level configs being loaded
 
