@@ -84,7 +84,7 @@ const Members = () => {
       totalPoints: member.xp,
       maxXp: levelData.maxXp,
       level: levelData.level,
-      levelProgress: member.levelProgress, // Use calculated progress from database
+      levelProgress: member.levelProgress,
       coursesCompleted: member.coursesCompleted ?? 0,
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? '',
@@ -115,6 +115,25 @@ const Members = () => {
     ? Math.round((onlineMembers / totalMembers) * 100) 
     : 0;
 
+  // Get top achievements for header
+  const topUsers = [
+    {
+      name: filteredMembers[0]?.name || "Chưa có dữ liệu",
+      achievement: `Rank #1 với ${filteredMembers[0]?.totalPoints?.toLocaleString() || 0} XP`,
+      value: filteredMembers[0]?.totalPoints || 0
+    },
+    {
+      name: membersWithStats.find(m => m.streak >= 7)?.name || "Chưa có dữ liệu",
+      achievement: `${membersWithStats.find(m => m.streak >= 7)?.streak || 0} ngày streak`,
+      value: membersWithStats.find(m => m.streak >= 7)?.streak || 0
+    },
+    {
+      name: membersWithStats.filter(m => m.isOnline).length > 0 ? `${membersWithStats.filter(m => m.isOnline).length} thành viên` : "Chưa có dữ liệu",
+      achievement: "đang online",
+      value: membersWithStats.filter(m => m.isOnline).length
+    }
+  ];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -134,6 +153,7 @@ const Members = () => {
         onlineMembers={onlineMembers}
         newMembersThisWeek={newMembersThisWeek}
         activePercentage={activePercentage}
+        topUsers={topUsers}
       />
 
       {/* Section Highlight Tuần này */}
@@ -143,7 +163,7 @@ const Members = () => {
           <span className="text-white font-semibold">
             {filteredMembers[0]?.name || 'Chưa có dữ liệu'}
           </span>
-          <span className="text-sm text-slate-400">– Rank #1 với {filteredMembers[0]?.totalPoints.toLocaleString() || 0} XP</span>
+          <span className="text-sm text-slate-400">– Rank #1 với {filteredMembers[0]?.totalPoints?.toLocaleString() || 0} XP</span>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-green-400/20 to-cyan-500/20 rounded-xl py-3 px-4">
           <Zap className="w-5 h-5 text-green-400" />

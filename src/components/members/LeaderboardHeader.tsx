@@ -16,13 +16,19 @@ interface LeaderboardHeaderProps {
   onlineMembers: number;
   newMembersThisWeek: number;
   activePercentage: number;
+  topUsers?: Array<{
+    name: string;
+    achievement: string;
+    value: string | number;
+  }>;
 }
 
 const LeaderboardHeader = ({ 
   totalMembers, 
   onlineMembers, 
   newMembersThisWeek, 
-  activePercentage 
+  activePercentage,
+  topUsers = []
 }: LeaderboardHeaderProps) => {
   const stats = [
     {
@@ -48,6 +54,28 @@ const LeaderboardHeader = ({
       label: 'Tham gia mới',
       value: `+${newMembersThisWeek}`,
       color: 'text-purple-400'
+    }
+  ];
+
+  // Default achievements if no topUsers provided
+  const defaultAchievements = [
+    {
+      icon: Crown,
+      name: topUsers[0]?.name || "Chưa có dữ liệu",
+      achievement: topUsers[0]?.achievement || "Đang cập nhật...",
+      color: "text-yellow-400"
+    },
+    {
+      icon: TrendingUp,
+      name: topUsers[1]?.name || "Chưa có dữ liệu", 
+      achievement: topUsers[1]?.achievement || "Đang cập nhật...",
+      color: "text-green-400"
+    },
+    {
+      icon: Trophy,
+      name: topUsers[2]?.name || "Chưa có dữ liệu",
+      achievement: topUsers[2]?.achievement || "Đang cập nhật...",
+      color: "text-purple-400"
     }
   ];
 
@@ -93,21 +121,13 @@ const LeaderboardHeader = ({
             </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-              <Crown className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-              <p className="font-semibold text-white">Hoàng Minh</p>
-              <p className="text-sm text-slate-400">Hoàn thành 5 khóa học</p>
-            </div>
-            <div className="text-center p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-              <TrendingUp className="w-8 h-8 text-green-400 mx-auto mb-2" />
-              <p className="font-semibold text-white">Lan Anh</p>
-              <p className="text-sm text-slate-400">30 ngày streak học tập</p>
-            </div>
-            <div className="text-center p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-              <Trophy className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-              <p className="font-semibold text-white">Đức Thành</p>
-              <p className="text-sm text-slate-400">Top 1 điểm số tháng</p>
-            </div>
+            {defaultAchievements.map((achievement, index) => (
+              <div key={index} className="text-center p-4 bg-slate-800/30 rounded-lg border border-slate-700">
+                <achievement.icon className={`w-8 h-8 ${achievement.color} mx-auto mb-2`} />
+                <p className="font-semibold text-white">{achievement.name}</p>
+                <p className="text-sm text-slate-400">{achievement.achievement}</p>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
