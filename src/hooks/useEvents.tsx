@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -72,7 +73,7 @@ const sendRegistrationWebhook = async (event: Event, userName: string, userId: s
   try {
     console.log('Sending registration webhook for event:', event.id, 'user:', userName);
     
-    const webhookUrl = 'https://mcbaivn.tino.page/webhook-test/eventjoint';
+    const webhookUrl = 'https://mcbaivn.tino.page/webhook/eventjoint';
     const credentials = btoa('MCBAIVN:Machbang8920!');
     
     const response = await fetch(webhookUrl, {
