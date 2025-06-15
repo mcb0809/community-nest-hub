@@ -12,7 +12,8 @@ import {
   TrendingUp,
   Zap,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  FileText
 } from 'lucide-react';
 import { ChevronDown } from "lucide-react";
 import { Card, CardContent } from '@/components/ui/card';
