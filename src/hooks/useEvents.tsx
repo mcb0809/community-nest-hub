@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -65,6 +66,41 @@ const sendEventWebhook = async (event: Event) => {
     }
   } catch (error) {
     console.error('Error sending webhook:', error);
+  }
+};
+
+const sendRegistrationWebhook = async (event: Event, userName: string, userId: string) => {
+  try {
+    console.log('Sending registration webhook for event:', event.id, 'user:', userName);
+    
+    const webhookUrl = 'https://mcbaivn.tino.page/webhook/eventjoint';
+    const credentials = btoa('MCBAIVN:Machbang8920!');
+    
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: JSON.stringify({
+        event_id: event.id,
+        event_title: event.title,
+        event_date: event.date,
+        event_time: event.time,
+        user_id: userId,
+        user_name: userName,
+        registered_at: new Date().toISOString(),
+        timestamp: new Date().toISOString()
+      })
+    });
+
+    if (response.ok) {
+      console.log('Registration webhook sent successfully');
+    } else {
+      console.error('Registration webhook failed with status:', response.status);
+    }
+  } catch (error) {
+    console.error('Error sending registration webhook:', error);
   }
 };
 
@@ -239,6 +275,9 @@ export const useEvents = () => {
           registered: event.registered + 1,
           registered_users: newRegisteredUsers
         });
+
+        // Send registration webhook after successful registration
+        await sendRegistrationWebhook(event, userName, user.id);
       }
 
       toast({
