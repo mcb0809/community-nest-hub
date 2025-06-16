@@ -17,10 +17,9 @@ import {
 } from 'lucide-react';
 import { ChevronDown } from "lucide-react";
 import { Card, CardContent } from '@/components/ui/card';
-import { useLeaderboardRealtime, recalculateUserStats } from '@/hooks/useLeaderboardRealtime';
+import { useSimpleLeaderboard } from '@/hooks/useSimpleLeaderboard';
 import { useLevelConfig } from '@/hooks/useLevelConfig';
 import { useToast } from '@/hooks/use-toast';
-import { useOnlineTracking } from '@/hooks/useOnlineTracking';
 
 const filterOptions = [
   { value: 'all', label: 'Tất cả', icon: Trophy },
@@ -38,22 +37,16 @@ const Members = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  // Initialize online tracking for current user (only session tracking, not presence)
-  useOnlineTracking();
-
-  // Get realtime data from Supabase using the updated hook (handles both data and presence)
-  const { users: members, loading } = useLeaderboardRealtime();
+  // Use simplified hook to avoid conflicts
+  const { users: members, loading } = useSimpleLeaderboard();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
 
-  // Handle manual refresh/recalculation
+  // Handle manual refresh
   const handleRefreshStats = async () => {
     setIsRefreshing(true);
     try {
-      await recalculateUserStats();
-      toast({
-        title: "Stats Updated",
-        description: "All user statistics have been recalculated",
-      });
+      // Just reload the page for now to avoid conflicts
+      window.location.reload();
     } catch (error) {
       toast({
         title: "Error",
@@ -132,7 +125,7 @@ const Members = () => {
       streak: member.streak ?? 0,
       joinDate: member.joinDate ?? new Date().toISOString(),
       isOnline: typeof member.isOnline === "boolean" ? member.isOnline : false,
-      messagesCount: member.postsCount ?? 0, // Use postsCount from the hook
+      messagesCount: member.postsCount ?? 0,
       levelName: member.levelName || levelConfig?.level_name,
       levelColor: member.levelColor || levelConfig?.color,
       levelIcon: member.levelIcon || levelConfig?.icon,
@@ -146,7 +139,7 @@ const Members = () => {
       (filterType === 'top10' && member.rank <= 10) ||
       (filterType === 'online' && member.isOnline) ||
       (filterType === 'streak' && (member.streak || 0) >= 7) ||
-      (filterType === 'chatters' && (member.messagesCount || 0) >= 1); // Changed threshold to 1 post
+      (filterType === 'chatters' && (member.messagesCount || 0) >= 1);
     const matchesLevel = levelFilter ? member.level === levelFilter : true;
     return matchesSearch && matchesFilter && matchesLevel;
   });
@@ -217,7 +210,7 @@ const Members = () => {
         topUsers={topUsers}
       />
 
-      {/* Section Highlight Tuần này - Updated to show posts */}
+      {/* Section Highlight Tuần này */}
       <div className="flex flex-col md:flex-row items-center justify-center gap-4">
         <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-400/20 to-purple-500/20 rounded-xl py-3 px-4">
           <Trophy className="w-5 h-5 text-yellow-400" />
