@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useLevelConfig } from "./useLevelConfig";
@@ -27,6 +28,8 @@ export function useLeaderboardRealtime() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { levelConfigs, getLevelByNumber } = useLevelConfig();
+  const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   const fetchLeaderboard = useCallback(async () => {
     if (levelConfigs.length === 0) {
@@ -87,7 +90,7 @@ export function useLeaderboardRealtime() {
           coursesCompleted: userStats?.courses_completed ?? 0,
           streak: userStats?.current_streak ?? 0,
           badges: [],
-          isOnline: false, // Default to false, will be updated by presence
+          isOnline: false,
           joinDate: profile.created_at || new Date().toISOString(),
           title: undefined,
           postsCount: postsCounts[profile.id] || 0,
@@ -121,19 +124,24 @@ export function useLeaderboardRealtime() {
     }
   }, [levelConfigs, getLevelByNumber]);
 
-  // Effect to run the initial fetch and subsequent fetches when configs change
+  // Initial data fetch
   useEffect(() => {
     fetchLeaderboard();
   }, [fetchLeaderboard]);
   
-  // Effect to manage the realtime channel
+  // Real-time subscription management
   useEffect(() => {
-    if (!user?.id) {
+    if (!user?.id || isSubscribedRef.current) {
       return;
     }
 
-    // Use a stable channel name. Supabase handles channel instances.
-    const channel = supabase.channel('leaderboard-realtime');
+    console.log('Setting up realtime channel for user:', user.id);
+    
+    // Create a new channel with a unique name
+    const channelName = `leaderboard-${Date.now()}`;
+    const channel = supabase.channel(channelName);
+    channelRef.current = channel;
+    isSubscribedRef.current = true;
 
     const handleSync = () => {
       const state = channel.presenceState();
@@ -160,6 +168,7 @@ export function useLeaderboardRealtime() {
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, fetchLeaderboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "level_config" }, fetchLeaderboard)
       .subscribe(async (status) => {
+        console.log('Channel subscription status:', status);
         if (status === 'SUBSCRIBED') {
           await channel.track({
             user_id: user.id,
@@ -169,9 +178,14 @@ export function useLeaderboardRealtime() {
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      console.log('Cleaning up realtime channel');
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      isSubscribedRef.current = false;
     };
-  }, [user?.id, fetchLeaderboard]);
+  }, [user?.id]); // Only depend on user.id, not fetchLeaderboard
 
   return { users, loading };
 }
@@ -204,7 +218,6 @@ export const logXPAction = async (
   }
 };
 
-// Utility function to recalculate user stats
 export const recalculateUserStats = async (userId?: string): Promise<void> => {
   try {
     const { error } = await supabase.rpc('recalculate_user_stats', {
