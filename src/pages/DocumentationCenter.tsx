@@ -74,35 +74,6 @@ const DocumentationCenter = () => {
     });
   };
 
-  const handleDownload = async (doc: any) => {
-    try {
-      // Create a temporary anchor element to trigger download
-      const link = document.createElement('a');
-      link.href = doc.file_url;
-      link.download = doc.title || 'document';
-      link.target = '_blank';
-      
-      // For cross-origin files, we need to fetch and create blob
-      const response = await fetch(doc.file_url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      console.log('Download initiated for:', doc.title);
-    } catch (error) {
-      console.error('Download failed:', error);
-      // Fallback to opening in new tab if download fails
-      window.open(doc.file_url, '_blank');
-    }
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -255,7 +226,7 @@ const DocumentationCenter = () => {
                       <Button 
                         size="sm" 
                         className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600"
-                        onClick={() => handleDownload(doc)}
+                        onClick={() => window.open(doc.file_url, '_blank')}
                       >
                         <Download className="w-4 h-4 mr-2" />
                         Tải về
