@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +29,6 @@ interface MemberStats {
   badges: string[];
   isOnline: boolean;
   title?: string;
-  levelName?: string;
-  levelColor?: string;
-  levelIcon?: string;
 }
 
 interface MemberCardProps {
@@ -95,22 +91,10 @@ const MemberCard = ({ member, index }: MemberCardProps) => {
           </div>
           <div className="flex-1">
             <h3 className="font-bold text-white text-lg">{member.name}</h3>
-            {member.levelName && (
-              <div className="flex items-center space-x-2 mt-1">
-                <span className="text-lg">{member.levelIcon}</span>
-                <span 
-                  className="text-sm font-medium px-2 py-1 rounded"
-                  style={{ 
-                    color: member.levelColor,
-                    backgroundColor: `${member.levelColor}20`,
-                    border: `1px solid ${member.levelColor}40`
-                  }}
-                >
-                  {member.levelName}
-                </span>
-              </div>
+            {member.title && (
+              <p className="text-sm text-purple-300 font-medium">{member.title}</p>
             )}
-            <p className="text-xs text-slate-400 mt-1">Tham gia {new Date(member.joinDate).toLocaleDateString('vi-VN')}</p>
+            <p className="text-xs text-slate-400">Tham gia {new Date(member.joinDate).toLocaleDateString('vi-VN')}</p>
           </div>
         </div>
 

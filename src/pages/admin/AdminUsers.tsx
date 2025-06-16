@@ -5,11 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import UserTable from '@/components/admin/users/UserTable';
 import UserDetailDrawer from '@/components/admin/users/UserDetailDrawer';
 import XPConfigForm from '@/components/admin/users/XPConfigForm';
-import LevelConfigForm from '@/components/admin/users/LevelConfigForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Settings, BarChart3, RefreshCw, Trophy } from 'lucide-react';
+import { Users, Settings, BarChart3, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { recalculateUserStats } from '@/hooks/useLeaderboardRealtime';
 
@@ -152,13 +151,9 @@ const AdminUsers = () => {
             <BarChart3 className="w-4 h-4 mr-2" />
             Analytics
           </TabsTrigger>
-          <TabsTrigger value="xp-settings" className="data-[state=active]:bg-slate-700">
+          <TabsTrigger value="settings" className="data-[state=active]:bg-slate-700">
             <Settings className="w-4 h-4 mr-2" />
             XP Settings
-          </TabsTrigger>
-          <TabsTrigger value="level-settings" className="data-[state=active]:bg-slate-700">
-            <Trophy className="w-4 h-4 mr-2" />
-            Level Settings
           </TabsTrigger>
         </TabsList>
 
@@ -181,12 +176,8 @@ const AdminUsers = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="xp-settings">
+        <TabsContent value="settings">
           <XPConfigForm />
-        </TabsContent>
-
-        <TabsContent value="level-settings">
-          <LevelConfigForm />
         </TabsContent>
       </Tabs>
 

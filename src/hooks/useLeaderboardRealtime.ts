@@ -1,8 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import { RealtimeChannel } from "@supabase/supabase-js";
+
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { useLevelConfig } from "./useLevelConfig";
 
 export interface LeaderboardUser {
   id: string;
@@ -18,232 +17,259 @@ export interface LeaderboardUser {
   joinDate: string;
   title?: string;
   postsCount: number;
-  levelName?: string;
-  levelColor?: string;
-  levelIcon?: string;
 }
 
 export function useLeaderboardRealtime() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const { user } = useAuth();
-  const { levelConfigs, getLevelByNumber } = useLevelConfig();
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const isSubscribedRef = useRef(false);
 
-  const fetchLeaderboard = useCallback(async () => {
-    if (levelConfigs.length === 0) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
+  async function fetchLeaderboard() {
+    console.log("Fetching leaderboard data...");
+    
     try {
-      console.log('Fetching leaderboard data...');
+      // Get user profiles data
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("user_profiles")
+        .select(`
+          id,
+          display_name,
+          avatar_url,
+          email,
+          created_at
+        `);
       
-      // Use member_leaderboard view instead of manual joins to avoid conflicts
-      const { data: leaderboardData, error: leaderboardError } = await supabase
-        .from("member_leaderboard")
-        .select("*")
-        .order("total_xp", { ascending: false });
+      if (profilesError) {
+        console.error("Error fetching user profiles:", profilesError);
+        setLoading(false);
+        return;
+      }
 
-      if (leaderboardError) {
-        console.error('Error fetching leaderboard:', leaderboardError);
-        // Try fallback approach
-        const [profilesResult, statsResult, postsResult] = await Promise.all([
-          supabase
-            .from("user_profiles")
-            .select(`id, display_name, avatar_url, email, created_at`),
-          supabase.from("user_stats").select("*"),
-          supabase.from("posts").select("user_id").eq("visibility", "public")
-        ]);
+      console.log("User profiles data:", profilesData);
 
-        if (profilesResult.error) throw profilesResult.error;
-        if (statsResult.error) throw statsResult.error;
-        if (postsResult.error) throw postsResult.error;
+      // Get user stats separately
+      const { data: statsData, error: statsError } = await supabase
+        .from("user_stats")
+        .select("*");
 
-        const postsCounts: Record<string, number> = {};
-        if (postsResult.data) {
-          postsResult.data.forEach(post => {
-            if (post.user_id) {
-              postsCounts[post.user_id] = (postsCounts[post.user_id] || 0) + 1;
-            }
-          });
-        }
+      if (statsError) {
+        console.warn("Error fetching user stats:", statsError);
+      }
 
-        const calculateLevelProgress = (xp: number, currentLevel: number) => {
-          if (!levelConfigs.length) return 0;
-          const currentLevelConfig = getLevelByNumber(currentLevel);
-          const nextLevelConfig = getLevelByNumber(currentLevel + 1);
-          if (!currentLevelConfig) return 0;
-          if (!nextLevelConfig) return 100;
-          const currentLevelXp = currentLevelConfig.required_xp;
-          const nextLevelXp = nextLevelConfig.required_xp;
-          const progressXp = Math.max(0, xp - currentLevelXp);
-          const requiredXp = nextLevelXp - currentLevelXp;
-          return Math.min(100, Math.max(0, Math.round((progressXp / requiredXp) * 100)));
+      console.log("User stats data:", statsData);
+
+      // Get posts count for each user
+      const { data: postsData, error: postsError } = await supabase
+        .from("posts")
+        .select("user_id")
+        .eq("visibility", "public");
+
+      if (postsError) {
+        console.warn("Error fetching posts:", postsError);
+      }
+
+      // Count posts by user
+      const postsCounts: Record<string, number> = {};
+      if (postsData) {
+        postsData.forEach(post => {
+          if (post.user_id) {
+            postsCounts[post.user_id] = (postsCounts[post.user_id] || 0) + 1;
+          }
+        });
+      }
+
+      console.log("Posts counts:", postsCounts);
+
+      // Combine all data
+      const mapped: LeaderboardUser[] = (profilesData || []).map((profile: any) => {
+        const userStats = statsData?.find(s => s.user_id === profile.id);
+        const totalXp = userStats?.total_xp || 0;
+        const level = userStats?.level || 1;
+        
+        // Simple level progress calculation
+        const calculateSimpleLevelProgress = (xp: number, currentLevel: number) => {
+          const levelThresholds = [1000, 1500, 2000, 2800, 4000, 6000, 8500, 12000, 18000, 25000];
+          
+          if (currentLevel <= 0 || currentLevel > levelThresholds.length) {
+            return 0;
+          }
+          
+          let accumulatedXp = 0;
+          for (let i = 0; i < currentLevel - 1; i++) {
+            accumulatedXp += levelThresholds[i] || 0;
+          }
+          
+          const currentLevelThreshold = levelThresholds[currentLevel - 1] || 1000;
+          const progressXp = Math.max(0, xp - accumulatedXp);
+          const progress = Math.min(100, Math.max(0, Math.round((progressXp / currentLevelThreshold) * 100)));
+          
+          return progress;
         };
 
-        const mapped = (profilesResult.data || []).map((profile: any) => {
-          const userStats = statsResult.data?.find(s => s.user_id === profile.id);
-          const totalXp = userStats?.total_xp || 0;
-          const level = userStats?.level || 1;
-          const levelConfig = getLevelByNumber(level);
+        return {
+          id: profile.id,
+          name: profile.display_name || 'Anonymous',
+          avatar: profile.avatar_url,
+          xp: totalXp,
+          level: level,
+          levelProgress: calculateSimpleLevelProgress(totalXp, level),
+          coursesCompleted: userStats?.courses_completed || 0,
+          streak: userStats?.current_streak || 0,
+          badges: [], // Will be implemented with badge system later
+          isOnline: onlineUsers.has(profile.id), // Check if user is in online users set
+          joinDate: profile.created_at || new Date().toISOString(),
+          title: undefined, // Can be set based on achievements later
+          postsCount: postsCounts[profile.id] || 0,
+        };
+      });
 
-          return {
-            id: profile.id,
-            name: profile.display_name || 'Anonymous',
-            avatar: profile.avatar_url,
-            xp: totalXp,
-            level: level,
-            levelProgress: calculateLevelProgress(totalXp, level),
-            coursesCompleted: userStats?.courses_completed ?? 0,
-            streak: userStats?.current_streak ?? 0,
-            badges: [],
-            isOnline: false,
-            joinDate: profile.created_at || new Date().toISOString(),
-            title: undefined,
-            postsCount: postsCounts[profile.id] || 0,
-            levelName: levelConfig?.level_name,
-            levelColor: levelConfig?.color,
-            levelIcon: levelConfig?.icon,
-          };
-        });
-
-        mapped.sort((a, b) => b.xp - a.xp);
-        setUsers(mapped);
-      } else {
-        // Use leaderboard view data
-        const mapped = (leaderboardData || []).map((member: any) => {
-          const levelConfig = getLevelByNumber(member.level || 1);
-          
-          return {
-            id: member.id,
-            name: member.name || 'Anonymous',
-            avatar: member.avatar,
-            xp: member.total_xp || 0,
-            level: member.level || 1,
-            levelProgress: member.level_progress || 0,
-            coursesCompleted: member.courses_completed || 0,
-            streak: member.streak_days || 0,
-            badges: [],
-            isOnline: member.is_online || false,
-            joinDate: member.joined_at || new Date().toISOString(),
-            title: undefined,
-            postsCount: member.posts_count || 0,
-            levelName: levelConfig?.level_name,
-            levelColor: levelConfig?.color,
-            levelIcon: levelConfig?.icon,
-          };
-        });
-
-        setUsers(mapped);
-      }
+      // Sort by XP descending
+      mapped.sort((a, b) => b.xp - a.xp);
+      
+      console.log("Final mapped leaderboard users:", mapped);
+      setUsers(mapped);
+      setLoading(false);
     } catch (error) {
-      console.error('Error in fetchLeaderboard:', error);
+      console.error("Unexpected error fetching leaderboard:", error);
       setUsers([]);
-    } finally {
       setLoading(false);
     }
-  }, [levelConfigs, getLevelByNumber]);
+  }
 
-  // Initial data fetch
   useEffect(() => {
     fetchLeaderboard();
-  }, [fetchLeaderboard]);
+    
+    // Set up a single presence channel for tracking online users and current user presence
+    const presenceChannel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: 'user_id',
+        },
+      },
+    });
 
-  // Simplified realtime subscription - only for presence tracking
-  useEffect(() => {
-    if (!user?.id) return;
-
-    let mounted = true;
-    let retryTimeout: NodeJS.Timeout;
-
-    const setupChannel = async () => {
-      if (!mounted) return;
-
-      try {
-        // Cleanup existing channel
-        if (channelRef.current) {
-          await supabase.removeChannel(channelRef.current);
-          channelRef.current = null;
-          isSubscribedRef.current = false;
-        }
-
-        // Create new channel with stable name
-        const channelName = `members-presence-${user.id}`;
-        const channel = supabase.channel(channelName);
-        channelRef.current = channel;
-
-        const handleSync = () => {
-          if (!mounted) return;
-          
-          try {
-            const state = channel.presenceState();
-            const onlineUserIds = new Set<string>();
-            
-            Object.values(state).forEach((presences: any) => {
-              presences.forEach((presence: any) => {
-                if (presence.user_id) onlineUserIds.add(presence.user_id);
-              });
-            });
-
-            setUsers(prevUsers =>
-              prevUsers.map(u => ({
-                ...u,
-                isOnline: onlineUserIds.has(u.id)
-              }))
-            );
-          } catch (error) {
-            console.warn('Error handling presence sync:', error);
-          }
-        };
-
-        // Setup presence listeners only
-        channel
-          .on('presence', { event: 'sync' }, handleSync)
-          .on('presence', { event: 'join' }, handleSync)
-          .on('presence', { event: 'leave' }, handleSync);
-
-        // Subscribe and track presence
-        const status = await channel.subscribe();
-        if (status === 'SUBSCRIBED' && mounted) {
-          isSubscribedRef.current = true;
-          await channel.track({
-            user_id: user.id,
-            online_at: new Date().toISOString()
+    // Listen for presence sync events
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        console.log('Presence sync:', state);
+        
+        // Extract user IDs from presence state
+        const onlineUserIds = new Set<string>();
+        Object.keys(state).forEach(key => {
+          const presences = state[key];
+          presences.forEach((presence: any) => {
+            if (presence.user_id) {
+              onlineUserIds.add(presence.user_id);
+            }
           });
-        } else {
-          console.warn('Failed to subscribe to presence channel:', status);
+        });
+        
+        console.log('Online users:', onlineUserIds);
+        setOnlineUsers(onlineUserIds);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('User joined:', key, newPresences);
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('User left:', key, leftPresences);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Track current user's presence if authenticated
+          if (user) {
+            console.log('Tracking user presence:', user.id);
+            await presenceChannel.track({
+              user_id: user.id,
+              online_at: new Date().toISOString(),
+            });
+          }
         }
-      } catch (error) {
-        console.error('Error setting up presence channel:', error);
-        // Retry after 5 seconds
-        if (mounted) {
-          retryTimeout = setTimeout(() => {
-            if (mounted) setupChannel();
-          }, 5000);
+      });
+
+    // Set up data changes channel
+    const dataChannel = supabase
+      .channel("realtime-leaderboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_stats" },
+        (payload) => {
+          console.log("User stats changed:", payload);
+          fetchLeaderboard();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "xp_logs" },
+        (payload) => {
+          console.log("XP logs changed:", payload);
+          fetchLeaderboard();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "posts" },
+        (payload) => {
+          console.log("Posts changed:", payload);
+          fetchLeaderboard();
+        }
+      )
+      .subscribe();
+
+    // Handle page visibility changes for presence tracking
+    const handleVisibilityChange = () => {
+      if (user) {
+        if (document.hidden) {
+          console.log('Page hidden, untracking presence');
+          presenceChannel.untrack();
+        } else {
+          console.log('Page visible, tracking presence');
+          presenceChannel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString(),
+          });
         }
       }
     };
 
-    setupChannel();
+    // Handle page unload
+    const handleBeforeUnload = () => {
+      if (user) {
+        console.log('Page unloading, untracking presence');
+        presenceChannel.untrack();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      mounted = false;
-      if (retryTimeout) clearTimeout(retryTimeout);
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-        isSubscribedRef.current = false;
+      console.log('Cleaning up channels and event listeners');
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // Untrack presence before removing channels
+      if (user) {
+        presenceChannel.untrack();
       }
+      
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(dataChannel);
     };
-  }, [user?.id]);
+  }, [user?.id]); // Only re-run when user ID changes
+
+  // Re-fetch when online users change
+  useEffect(() => {
+    if (users.length > 0) {
+      fetchLeaderboard();
+    }
+  }, [onlineUsers.size]);
 
   return { users, loading };
 }
 
-// Utility functions remain the same
+// Utility function to log XP actions
 export const logXPAction = async (
   userId: string,
   actionType: string,
@@ -257,10 +283,12 @@ export const logXPAction = async (
       p_description: description,
       p_related_id: relatedId
     });
+
     if (error) {
       console.error('Error logging XP action:', error);
       return 0;
     }
+
     console.log(`XP Action logged: ${actionType} +${data}XP for user ${userId}`);
     return data || 0;
   } catch (error) {
@@ -269,15 +297,18 @@ export const logXPAction = async (
   }
 };
 
+// Utility function to recalculate user stats
 export const recalculateUserStats = async (userId?: string): Promise<void> => {
   try {
     const { error } = await supabase.rpc('recalculate_user_stats', {
       target_user_id: userId || null
     });
+
     if (error) {
       console.error('Error recalculating user stats:', error);
       return;
     }
+
     console.log(`User stats recalculated for ${userId ? `user ${userId}` : 'all users'}`);
   } catch (error) {
     console.error('Error calling recalculate_user_stats:', error);
