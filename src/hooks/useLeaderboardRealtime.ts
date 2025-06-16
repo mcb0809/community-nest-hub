@@ -131,17 +131,28 @@ export function useLeaderboardRealtime() {
   
   // Real-time subscription management
   useEffect(() => {
-    if (!user?.id || isSubscribedRef.current) {
+    if (!user?.id) {
       return;
+    }
+
+    // Early return if already subscribed
+    if (isSubscribedRef.current && channelRef.current) {
+      return;
+    }
+
+    // Clean up any existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+      isSubscribedRef.current = false;
     }
 
     console.log('Setting up realtime channel for user:', user.id);
     
-    // Create a new channel with a unique name
-    const channelName = `leaderboard-${Date.now()}`;
+    // Use stable channel name based on user ID
+    const channelName = `leaderboard-${user.id}`;
     const channel = supabase.channel(channelName);
     channelRef.current = channel;
-    isSubscribedRef.current = true;
 
     const handleSync = () => {
       const state = channel.presenceState();
@@ -170,6 +181,7 @@ export function useLeaderboardRealtime() {
       .subscribe(async (status) => {
         console.log('Channel subscription status:', status);
         if (status === 'SUBSCRIBED') {
+          isSubscribedRef.current = true;
           await channel.track({
             user_id: user.id,
             online_at: new Date().toISOString()
@@ -185,7 +197,7 @@ export function useLeaderboardRealtime() {
       }
       isSubscribedRef.current = false;
     };
-  }, [user?.id]); // Only depend on user.id, not fetchLeaderboard
+  }, [user?.id, fetchLeaderboard]);
 
   return { users, loading };
 }
